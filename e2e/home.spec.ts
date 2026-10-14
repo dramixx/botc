@@ -37,7 +37,7 @@ test.describe('home', () => {
     await page.goto('/');
     await page.getByRole('button', { name: 'Nouvelle partie' }).click();
     await expect(page.locator('.setup-bar-title')).toHaveText('Nouvelle partie');
-    await expect(page.locator('.step-pill.cur')).toContainText('Joueurs');
+    await expect(page.locator('.step-pill.cur')).toContainText('Personnages');
   });
 
   test('importing garbage shows a readable error and changes nothing', async ({ page }) => {

@@ -106,7 +106,7 @@ export function Circle(props: { game: Game; hidden: boolean; overlay?: Overlay; 
       </svg>
       {g.players.map((p, i) => {
         const [x, y] = pos(i);
-        return <Token key={p.id} p={p} seat={i + 1} x={x} y={y} hidden={hidden} badge={hl[p.id]} trail={hidden ? undefined : ov.trail?.[p.id]} dim={hasHl && !hl[p.id] && !(!hidden && ov.trail?.[p.id]?.length)} onTap={() => props.onTap(p.id)} />;
+        return <Token key={p.id} p={p} seat={i + 1} x={x} y={y} hidden={hidden} badge={hl[p.id]} trail={hidden ? undefined : ov.trail?.[p.id]} dim={!!ov.faded?.includes(p.id) || hasHl && !ov.noDim && !hl[p.id] && !(!hidden && ov.trail?.[p.id]?.length)} onTap={() => props.onTap(p.id)} />;
       })}
       {links.filter((l) => l.label).map((l, i) => (
         <div key={i} class="circle-label" style={{ left: `${l.lp[0]}%`, top: `${l.lp[1]}%`, color: TONE_VAR[l.tone], borderColor: TONE_VAR[l.tone], opacity: l.op ?? 1 }}>{l.label}</div>
@@ -159,7 +159,7 @@ function Token(props: { p: Player; seat: number; x: number; y: number; hidden: b
           <span class="pstat">{status}{!p.alive && <i class={`ghostdot ${p.ghostVote ? '' : 'spent'}`} title={p.ghostVote ? T('Vote fantôme disponible', 'Ghost vote available') : T('Vote fantôme utilisé', 'Ghost vote spent')} />}</span>
         </span>
         <span class={`prole ${name.length > 13 ? 'xl' : name.length > 9 ? 'lg' : ''}`}>{hidden ? '· · ·' : name}</span>
-        <span class="pname">{p.name}</span>
+        <span class={`pname ${p.name ? '' : 'unnamed'}`}>{p.name || T('sans prénom', 'no name')}</span>
       </span>
       {(marks.length > 0 || !!props.trail?.length) && (
         <span class="pmarks">

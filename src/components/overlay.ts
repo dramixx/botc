@@ -26,6 +26,10 @@ export interface Overlay {
   trail?: Record<string, TrailMark[]>;
   /** Replaces the centre text: [title, subtitle, pill]. */
   center?: [string, string, string?];
+  /** Keep the players without a badge at full opacity (selection rather than focus). */
+  noDim?: boolean;
+  /** Players shown faded whatever the badges (already done, e.g. character seen at the hand-out). */
+  faded?: string[];
   /** Dim the whole circle (journal, reference...). */
   dim?: boolean;
 }

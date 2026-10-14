@@ -23,7 +23,7 @@ test.describe('storyteller guide', () => {
     await page.goto('/');
     await page.getByRole('button', { name: /Guide du Conteur/ }).click();
     await page.getByRole('button', { name: 'Nouvelle partie →' }).click();
-    await expect(page.locator('.step-pill.cur')).toContainText('Joueurs');
+    await expect(page.locator('.step-pill.cur')).toContainText('Personnages');
   });
 
   test('the rules presentation follows the chosen player count', async ({ page }) => {

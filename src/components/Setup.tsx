@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { ROLES, rolesOfTeam, type Alignment, type RoleId, type Team } from '../data/roles';
 import {
-  L, addMarker, addTraveller, autoAssign, checkSetup, completeRoles, hasMarker, isTraveller, log, notInPlay,
-  prepareSecrets, randomNames, randomRoles, removeMarkers, rerollTeam, reorderPlayer, setPlayerCount, setRole, startNight, wakeRole,
+  L, addMarker, addTraveller, autoAssign, checkSetup, completeRoles, dealRoles, hasMarker, isTraveller, log, movePlayer, notInPlay,
+  prepareSecrets, randomNames, randomRoles, removeMarkers, rerollTeam, setPlayerCount, setRole, setupStepOf, startNight, swapCharacters, wakeRole,
 } from '../game/engine';
 import { DRAW_STYLES, STYLE_INFO } from '../game/drawStyles';
 import { random, shuffle } from '../game/rng';
@@ -14,33 +14,38 @@ import { openBriefing, openGuide } from './Guide';
 import { QrCode } from './Handout';
 import { useRoom } from './Live';
 import { revealRole } from './ShowCard';
+import { Circle } from './Circle';
 import { Modal, RoleChip, RoleIcon, RolePicker, Seg, roleSide } from './ui';
 
-const STEPS: SetupStep[] = ['players', 'roles', 'assign', 'rules', 'distribute'];
+const STEPS: SetupStep[] = ['roles', 'seating', 'names', 'review', 'rules', 'distribute'];
 const stepLabel = (s: SetupStep) => ({
-  players: T('Joueurs', 'Players'), roles: T('Personnages', 'Characters'),
-  assign: T('Attribution', 'Assignment'), rules: T('Règles', 'Rules'), distribute: T('Distribution', 'Hand out'),
+  roles: T('Personnages', 'Characters'), seating: T('Placement', 'Seating'), names: T('Prénoms', 'Names'),
+  review: T('Vérification', 'Review'), rules: T('Règles', 'Rules'), distribute: T('Distribution', 'Hand out'),
 }[s]);
 const TEAMS = ['townsfolk', 'outsider', 'minion', 'demon'] as const;
 const teamTone = (t: Team) => (t === 'minion' || t === 'demon' ? 'mal' : 'bon');
+const seatNo = (g: Game, p: Player) => String(g.players.indexOf(p) + 1).padStart(2, '0');
+/** A player's name, or their seat while the table is not seated yet. */
+const seatLabel = (g: Game, p: Player) => p.name || `${T('Place', 'Seat')} ${seatNo(g, p)}`;
 
 export function Setup(props: { game: Game; onHome: () => void }) {
   const g = props.game;
-  const idx = STEPS.indexOf(g.setupStep);
+  const step = setupStepOf(g);
+  const idx = STEPS.indexOf(step);
   const go = (s: SetupStep) => update((d) => { d.setupStep = s; });
   const check = checkSetup(g.playerCount, g.selectedRoles);
   const regular = g.players.filter((p) => !isTraveller(p));
   const seen = g.players.filter((p) => p.seen).length;
 
   const blocked =
-    g.setupStep === 'roles' ? !check.ok :
-    g.setupStep === 'distribute' ? seen < g.players.length : false;
+    step === 'roles' ? !check.ok :
+    step === 'distribute' ? seen < g.players.length : false;
   const disabled =
-    g.setupStep === 'players' ? !g.players.every((p) => p.name.trim()) :
-    g.setupStep === 'assign' ? regular.some((p) => regular.filter((q) => q.role === p.role).length !== 1) : false;
+    step === 'names' ? !g.players.every((p) => p.name.trim()) :
+    step === 'seating' || step === 'review' ? regular.some((p) => regular.filter((q) => q.role === p.role).length !== 1) : false;
 
   const next = () => {
-    if (g.setupStep === 'roles') {
+    if (step === 'roles') {
       update((d) => {
         // Even when the distribution is off, there must be exactly one character per player.
         const count = d.players.filter((p) => !isTraveller(p)).length;
@@ -49,12 +54,11 @@ export function Setup(props: { game: Game; onHome: () => void }) {
         const spare = shuffle((['townsfolk', 'outsider', 'minion', 'demon'] as const).flatMap((t) => rolesOfTeam(t).map((r) => r.id)).filter((r) => !roles.includes(r)), random);
         while (roles.length < count) roles.push(spare.shift()!);
         d.selectedRoles = roles;
-        // Arriving on assignment: deal the selected characters if they don't match yet.
-        const current = d.players.filter((p) => !isTraveller(p)).map((p) => p.role).sort().join();
-        if (current !== [...roles].sort().join()) autoAssign(d);
-        d.setupStep = 'assign';
+        // Arriving on the seating: deal the characters, keeping the seats of those already placed.
+        dealRoles(d);
+        d.setupStep = 'seating';
       });
-    } else if (g.setupStep === 'distribute') {
+    } else if (step === 'distribute') {
       update((d) => {
         log(d, L(`Partie lancée avec ${d.players.length} joueurs.`, `Game started with ${d.players.length} players.`));
         for (const p of d.players) {
@@ -66,8 +70,8 @@ export function Setup(props: { game: Game; onHome: () => void }) {
     } else go(STEPS[idx + 1]);
   };
   const nextLabel =
-    g.setupStep === 'distribute' ? `${T('Commencer la nuit 1', 'Start night 1')}` :
-    g.setupStep === 'roles' && !check.ok ? T('Continuer quand même', 'Continue anyway') : `${T('Suivant', 'Next')} →`;
+    step === 'distribute' ? `${T('Commencer la nuit 1', 'Start night 1')}` :
+    step === 'roles' && !check.ok ? T('Continuer quand même', 'Continue anyway') : `${T('Suivant', 'Next')} →`;
 
   return (
     <div class="setup">
@@ -84,104 +88,12 @@ export function Setup(props: { game: Game; onHome: () => void }) {
         <button type="button" class={`btn next ${blocked ? 'blocked' : 'amber'}`} disabled={disabled} onClick={next}>{nextLabel}</button>
       </header>
       <div class="setup-body">
-        {g.setupStep === 'players' && <PlayersStep g={g} />}
-        {g.setupStep === 'roles' && <RolesStep g={g} />}
-        {g.setupStep === 'assign' && <AssignStep g={g} />}
-        {g.setupStep === 'rules' && <RulesStep />}
-        {g.setupStep === 'distribute' && <DistributeStep g={g} />}
-      </div>
-    </div>
-  );
-}
-
-// --- 1. Players -------------------------------------------------------------
-
-function DistribCells(props: { count: number; hasBaron: boolean }) {
-  const c = checkSetup(props.count, props.hasBaron ? ['baron'] : []);
-  return (
-    <div class="distrib">
-      {TEAMS.map((t) => (
-        <div key={t} class="distrib-cell">
-          <span class={`distrib-num tone-${teamTone(t)}`}>{c.expected[t]}</span>
-          <span class="distrib-label">{loc(TEAM_NAMES[t === 'demon' ? 'demon' : t])}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function PlayersStep({ g }: { g: Game }) {
-  const listRef = useRef<HTMLDivElement>(null);
-  const [drag, setDrag] = useState<{ id: string; over: number } | null>(null);
-
-  const indexAt = (x: number, y: number) => {
-    const rows = listRef.current?.querySelectorAll<HTMLElement>('[data-seat]') ?? [];
-    for (const r of rows) {
-      const b = r.getBoundingClientRect();
-      if (x >= b.left && x <= b.right && y >= b.top && y <= b.bottom) return Number(r.dataset.seat);
-    }
-    return null;
-  };
-  const focusNext = (e: KeyboardEvent) => {
-    if (e.key !== 'Enter') return;
-    const inputs = [...(listRef.current?.querySelectorAll<HTMLInputElement>('input') ?? [])];
-    const i = inputs.indexOf(e.currentTarget as HTMLInputElement);
-    (inputs[i + 1] ?? (e.currentTarget as HTMLInputElement)).focus();
-    if (!inputs[i + 1]) (e.currentTarget as HTMLInputElement).blur();
-  };
-
-  return (
-    <div class="players-step">
-      <div class="players-left">
-        <label class="field">
-          <span class="eyebrow">{T('NOM DE LA PARTIE', 'GAME NAME')}</span>
-          <input class="text-input" value={g.title} placeholder={T('Soirée du vendredi', 'Friday night')}
-            onInput={(e) => update((d) => { d.title = (e.target as HTMLInputElement).value; })} />
-        </label>
-        <div class="stack-sm">
-          <div class="eyebrow">{T('NOMBRE DE JOUEURS', 'NUMBER OF PLAYERS')}</div>
-          <div class="big-stepper">
-            <button type="button" class="btn sq" disabled={g.playerCount <= 5} onClick={() => update((d) => setPlayerCount(d, d.playerCount - 1))} aria-label="−">−</button>
-            <span class="big-stepper-value">{g.playerCount}</span>
-            <button type="button" class="btn sq" disabled={g.playerCount >= 15} onClick={() => update((d) => setPlayerCount(d, d.playerCount + 1))} aria-label="+">+</button>
-          </div>
-          <div class="home-note">{T('De 5 à 15 joueurs · Voyageurs ajoutés à l’étape 3', 'From 5 to 15 players · Travellers are added in step 3')}</div>
-        </div>
-        <div class="stack-sm">
-          <div class="eyebrow">{T('RÉPARTITION POUR', 'DISTRIBUTION FOR')} {g.playerCount}</div>
-          <DistribCells count={g.playerCount} hasBaron={g.selectedRoles.includes('baron')} />
-          <div class="home-note">{T('Ajustée automatiquement à l’étape suivante si le Baron est choisi.', 'Adjusted automatically in the next step if the Baron is chosen.')}</div>
-        </div>
-      </div>
-      <div class="players-right">
-        <div class="between">
-          <div class="stack-xs"><h2>{T('Ordre de la table', 'Table order')}</h2><span class="home-note">{T('Sens horaire · faites glisser ≡ pour réordonner', 'Clockwise · drag ≡ to reorder')}</span></div>
-          <button type="button" class="btn sm" onClick={() => update((d) => randomNames(d))}>{T('Noms au hasard', 'Random names')}</button>
-        </div>
-        <div class="seat-grid" ref={listRef}>
-          {g.players.map((p, i) => (
-            <div key={p.id} data-seat={i} class={`seat-row ${drag?.id === p.id ? 'dragging' : ''} ${drag && drag.over === i && drag.id !== p.id ? 'over' : ''}`}>
-              <span class="mono muted">{String(i + 1).padStart(2, '0')}</span>
-              <input class="seat-input" value={p.name} enterkeyhint="next" onKeyDown={focusNext}
-                onInput={(e) => update((d) => { d.players[i].name = (e.target as HTMLInputElement).value; })} />
-              {isTraveller(p) && <span class="tag">✈ {roleName(p.role)}</span>}
-              {isTraveller(p) && <button type="button" class="icon-btn" aria-label={T('Retirer', 'Remove')} onClick={() => update((d) => { d.players = d.players.filter((q) => q.id !== p.id); })}>×</button>}
-              <span class="handle" role="button" aria-label={T('Réordonner', 'Reorder')} style={{ touchAction: 'none' }}
-                onPointerDown={(e) => { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); setDrag({ id: p.id, over: i }); }}
-                onPointerMove={(e) => { if (!drag) return; const at = indexAt(e.clientX, e.clientY); if (at !== null && at !== drag.over) setDrag({ ...drag, over: at }); }}
-                onPointerUp={() => { if (drag && drag.over !== i) update((d) => reorderPlayer(d, drag.id, drag.over)); setDrag(null); }}
-                onPointerCancel={() => setDrag(null)}>≡</span>
-            </div>
-          ))}
-        </div>
-        <div class="dashed-hint">{T('Toucher un nom pour le modifier · Entrée passe au suivant', 'Tap a name to edit it · Enter jumps to the next one')}</div>
-        <div class="setup-help">
-          <span class="home-note">{T('Première partie ? Le guide explique tout le déroulé, et la présentation vous fait lire les règles à la table.', 'First game? The guide walks through the whole evening, and the presentation has you read the rules to the table.')}</span>
-          <div class="grid-2 tight">
-            <button type="button" class="btn sm" onClick={() => openGuide('start')}>{T('Guide du Conteur', 'Storyteller’s guide')}</button>
-            <button type="button" class="btn sm" onClick={() => openBriefing()}>{T('Présenter les règles', 'Present the rules')}</button>
-          </div>
-        </div>
+        {step === 'roles' && <RolesStep g={g} />}
+        {step === 'seating' && <TableStep g={g} review={false} />}
+        {step === 'names' && <NamesStep g={g} />}
+        {step === 'review' && <TableStep g={g} review />}
+        {step === 'rules' && <RulesStep onSkip={() => go('distribute')} />}
+        {step === 'distribute' && <DistributeStep g={g} />}
       </div>
     </div>
   );
@@ -216,7 +128,7 @@ export function AddTravellerModal(props: { onClose: () => void }) {
   );
 }
 
-// --- 2. Characters ------------------------------------------------------------
+// --- 1. Characters ------------------------------------------------------------
 
 const teamCount = (n: number, team: Team) => {
   const [one, many] = {
@@ -240,8 +152,34 @@ function RolesStep({ g }: { g: Game }) {
     if (!d) return [];
     return [d > 0 ? `${teamCount(d, t)} ${T('en trop', 'too many')}` : `${teamCount(-d, t)} ${T(-d > 1 ? 'manquants' : 'manquant', 'missing')}`];
   });
+  const resize = (n: number) => update((d) => {
+    setPlayerCount(d, n);
+    // A selection already made follows the table size: kept characters stay, the counts are adjusted.
+    if (d.selectedRoles.length) d.selectedRoles = completeRoles(d.selectedRoles, d.playerCount, random, style);
+  });
   return (
     <div class="roles-step">
+      <div class="roles-head">
+        <label class="field">
+          <span class="eyebrow">{T('NOM DE LA PARTIE', 'GAME NAME')}</span>
+          <input class="text-input" value={g.title} placeholder={T('Soirée du vendredi', 'Friday night')}
+            onInput={(e) => update((d) => { d.title = (e.target as HTMLInputElement).value; })} />
+        </label>
+        <div class="field">
+          <span class="eyebrow">{T('JOUEURS', 'PLAYERS')}</span>
+          <div class="count-stepper">
+            <button type="button" class="btn sq" disabled={g.playerCount <= 5} onClick={() => resize(g.playerCount - 1)} aria-label="−">−</button>
+            <span class="count-stepper-value">{g.playerCount}</span>
+            <button type="button" class="btn sq" disabled={g.playerCount >= 15} onClick={() => resize(g.playerCount + 1)} aria-label="+">+</button>
+          </div>
+        </div>
+        <div class="roles-help">
+          <button type="button" class="btn sm" onClick={() => openGuide('start')}>{T('Guide du Conteur', 'Storyteller’s guide')}</button>
+          <button type="button" class="btn sm" onClick={() => openBriefing()}>{T('Présenter les règles', 'Present the rules')}</button>
+        </div>
+      </div>
+      <div class="home-note">{T('Préparez la partie à l’avance : personnages, places autour de la table et secrets d’abord, les prénoms une fois tout le monde installé. Voyageurs ajoutés à la vérification.',
+        'Prepare the game ahead: characters, seats around the table and secrets first, the names once everyone is seated. Travellers are added at the review.')}</div>
       <div class="style-pick">
         <span class="style-pick-label">{T('Style de jeu', 'Play style')}</span>
         <Seg options={DRAW_STYLES.map((v) => ({ v, label: loc(STYLE_INFO[v].name) }))} value={style} onChange={(v) => update((d) => { d.drawStyle = v; })} />
@@ -286,84 +224,46 @@ function RolesStep({ g }: { g: Game }) {
   );
 }
 
-// --- 3. Assignment ------------------------------------------------------------
+// --- 2. Seating & 4. Review: the table as a circle ------------------------------
 
-function AssignStep({ g }: { g: Game }) {
-  const [editing, setEditing] = useState<string | null>(null);
+/** Drunk belief, Fortune Teller red herring and Demon bluffs: everything that hangs on characters, not on names. */
+function SecretsPanel({ g }: { g: Game }) {
   const [editingBluff, setEditingBluff] = useState<number | null>(null);
   const [drunkPick, setDrunkPick] = useState(false);
   const [rhPick, setRhPick] = useState(false);
-  const [addTrav, setAddTrav] = useState(false);
   const regular = g.players.filter((p) => !isTraveller(p));
-  const travellers = g.players.filter(isTraveller);
   const drunk = g.players.find((p) => p.role === 'drunk');
   const hasFT = g.players.some((p) => wakeRole(p) === 'fortuneteller');
   const rh = g.players.find((p) => hasMarker(p, 'redherring'));
-  const editP = g.players.find((p) => p.id === editing);
-
   return (
-    <div class="assign-step">
-      <div class="assign-main">
-        <div class="between"><h2>{T('Qui joue quoi', 'Who plays what')}</h2><button type="button" class="btn sm" onClick={() => update((d) => autoAssign(d))}><b>{T('Attribuer au hasard', 'Assign randomly')}</b></button></div>
-        <div class="assign-rows">
-          {regular.map((p, i) => {
-            const dup = regular.filter((q) => q.role === p.role).length > 1;
-            const note = p.role === 'drunk' ? `${T('croit être', 'thinks they are')} ${roleName(p.believedRole)}` :
-              hasMarker(p, 'redherring') ? T('faux positif', 'red herring') : dup ? T('rôle en double', 'duplicate character') : '';
-            return (
-              <div key={p.id} class="assign-row">
-                <span class="mono muted seat-n">{String(i + 1).padStart(2, '0')}</span>
-                <span class="assign-name">{p.name}</span>
-                <span class={`assign-note ${dup ? 'tone-mal' : ''}`}>{note}</span>
-                <button type="button" class={`role-select tone-${roleSide(p.role)}`} onClick={() => setEditing(p.id)}>
-                  <RoleIcon role={p.role} size={18} /><span>{roleName(p.role)}</span><i>▾</i>
-                </button>
-              </div>
-            );
-          })}
+    <>
+      {drunk && (
+        <div class="side-block">
+          <div class="eyebrow">{T('IVROGNE', 'DRUNK')} · {seatLabel(g, drunk).toUpperCase()} {T('CROIT ÊTRE', 'THINKS THEY ARE')}</div>
+          <button type="button" class={`field-btn ${drunk.believedRole ? `tone-${roleSide(drunk.believedRole)}` : ''}`} onClick={() => setDrunkPick(true)}>
+            <span class="serif">{roleName(drunk.believedRole)}</span><span class="muted">{T('Villageois hors jeu', 'Townsfolk not in play')} ▾</span>
+          </button>
         </div>
+      )}
+      {hasFT && (
+        <div class="side-block">
+          <div class="eyebrow">{T('VOYANTE · FAUX POSITIF', 'FORTUNE TELLER · RED HERRING')}</div>
+          <button type="button" class="field-btn plain" onClick={() => setRhPick(true)}>
+            <span><b class="serif">{rh ? roleName(rh.role) : '—'}</b>{rh && <span class="muted"> · {seatLabel(g, rh)}</span>}</span><span class="muted">{T('Personnage Bon', 'Good character')} ▾</span>
+          </button>
+        </div>
+      )}
+      <div class="side-block">
+        <div class="eyebrow">{T('BLUFFS DU DÉMON', 'DEMON BLUFFS')} · 3 {T('HORS JEU', 'NOT IN PLAY')}</div>
+        <div class="bluffs">
+          {[0, 1, 2].map((i) => g.bluffs[i]
+            ? <button type="button" key={i} class={`bluff tone-${roleSide(g.bluffs[i])}`} onClick={() => setEditingBluff(i)}>{roleName(g.bluffs[i])}</button>
+            : <button type="button" key={i} class="bluff empty" onClick={() => setEditingBluff(i)}>?</button>)}
+        </div>
+        <div class="between"><span class="home-note">{T('Proposés au hasard · toucher pour changer', 'Suggested at random · tap to change')}</span>
+          <button type="button" class="btn xs" onClick={() => update((d) => { d.bluffs = []; prepareSecrets(d); })}>{T('Retirer', 'Redraw')}</button></div>
       </div>
-      <aside class="assign-side">
-        {drunk && (
-          <div class="side-block">
-            <div class="eyebrow">{T('IVROGNE', 'DRUNK')} · {drunk.name.toUpperCase()} {T('CROIT ÊTRE', 'THINKS THEY ARE')}</div>
-            <button type="button" class={`field-btn ${drunk.believedRole ? `tone-${roleSide(drunk.believedRole)}` : ''}`} onClick={() => setDrunkPick(true)}>
-              <span class="serif">{roleName(drunk.believedRole)}</span><span class="muted">{T('Villageois hors jeu', 'Townsfolk not in play')} ▾</span>
-            </button>
-          </div>
-        )}
-        {hasFT && (
-          <div class="side-block">
-            <div class="eyebrow">{T('VOYANTE · FAUX POSITIF', 'FORTUNE TELLER · RED HERRING')}</div>
-            <button type="button" class="field-btn plain" onClick={() => setRhPick(true)}>
-              <span><b class="serif">{rh ? roleName(rh.role) : '—'}</b>{rh && <span class="muted"> · {rh.name}</span>}</span><span class="muted">{T('Personnage Bon', 'Good character')} ▾</span>
-            </button>
-          </div>
-        )}
-        <div class="side-block">
-          <div class="eyebrow">{T('BLUFFS DU DÉMON', 'DEMON BLUFFS')} · 3 {T('HORS JEU', 'NOT IN PLAY')}</div>
-          <div class="bluffs">
-            {[0, 1, 2].map((i) => g.bluffs[i]
-              ? <button type="button" key={i} class={`bluff tone-${roleSide(g.bluffs[i])}`} onClick={() => setEditingBluff(i)}>{roleName(g.bluffs[i])}</button>
-              : <button type="button" key={i} class="bluff empty" onClick={() => setEditingBluff(i)}>?</button>)}
-          </div>
-          <div class="between"><span class="home-note">{T('Proposés au hasard · toucher pour changer', 'Suggested at random · tap to change')}</span>
-            <button type="button" class="btn xs" onClick={() => update((d) => { d.bluffs = []; prepareSecrets(d); })}>{T('Retirer', 'Redraw')}</button></div>
-        </div>
-        <div class="side-block">
-          <div class="eyebrow">{T('VOYAGEURS', 'TRAVELLERS')}</div>
-          {travellers.map((p) => (
-            <div key={p.id} class="trav-row">
-              <b>{p.name}</b><span class={`serif tone-${p.alignment === 'good' ? 'bon' : 'mal'}`}>{roleName(p.role)}</span>
-              <span class={`tone-${p.alignment === 'good' ? 'bon' : 'mal'} small`}>{p.alignment === 'good' ? T('Bon', 'Good') : T('Maléfique', 'Evil')} · {T('place', 'seat')} {g.players.indexOf(p) + 1}</span>
-              <button type="button" class="icon-btn" aria-label={T('Retirer', 'Remove')} onClick={() => update((d) => { d.players = d.players.filter((q) => q.id !== p.id); })}>×</button>
-            </div>
-          ))}
-          <button type="button" class="btn" onClick={() => setAddTrav(true)}>+ {T('Ajouter un voyageur', 'Add a traveller')}</button>
-        </div>
-      </aside>
 
-      {editP && <SwapModal g={g} p={editP} onClose={() => setEditing(null)} />}
       {editingBluff !== null && (
         <Modal title={T('Choisir un bluff', 'Choose a bluff')} onClose={() => setEditingBluff(null)} wide>
           <RolePicker roles={notInPlay(g).filter((r) => !g.bluffs.includes(r) || r === g.bluffs[editingBluff])} value={g.bluffs[editingBluff]}
@@ -371,7 +271,7 @@ function AssignStep({ g }: { g: Game }) {
         </Modal>
       )}
       {drunkPick && drunk && (
-        <Modal title={`${drunk.name} ${T('croit être…', 'thinks they are…')}`} onClose={() => setDrunkPick(false)} wide>
+        <Modal title={`${seatLabel(g, drunk)} ${T('croit être…', 'thinks they are…')}`} onClose={() => setDrunkPick(false)} wide>
           <RolePicker roles={[...notInPlay(g, ['townsfolk']), ...(drunk.believedRole ? [drunk.believedRole] : [])]} value={drunk.believedRole}
             onChange={(r) => { update((d) => { d.players.find((x) => x.id === drunk.id)!.believedRole = r; d.bluffs = d.bluffs.filter((b) => b !== r); prepareSecrets(d); }); setDrunkPick(false); }} />
         </Modal>
@@ -381,7 +281,7 @@ function AssignStep({ g }: { g: Game }) {
           <p class="modal-text">{T('Un personnage Bon que la Voyante verra comme un Démon.', 'A good character the Fortune Teller sees as a Demon.')}</p>
           <div class="role-picker">
             {regular.filter((p) => p.alignment === 'good').map((p) => (
-              <RoleChip key={p.id} role={p.role} sub={p.name} selected={rh?.id === p.id} onClick={() => {
+              <RoleChip key={p.id} role={p.role} sub={seatLabel(g, p)} selected={rh?.id === p.id} onClick={() => {
                 update((d) => { removeMarkers(d, (m) => m.key === 'redherring'); addMarker(d.players.find((x) => x.id === p.id)!, 'redherring'); });
                 setRhPick(false);
               }} />
@@ -389,7 +289,147 @@ function AssignStep({ g }: { g: Game }) {
           </div>
         </Modal>
       )}
+    </>
+  );
+}
+
+/**
+ * The table as it will be played. Tap a seat, then another one: the two characters swap (names stay in their seats).
+ * The review also edits names, moves people between seats, and takes Travellers.
+ */
+function TableStep({ g, review }: { g: Game; review: boolean }) {
+  const [sel, setSel] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [addTrav, setAddTrav] = useState(false);
+  const regular = g.players.filter((p) => !isTraveller(p));
+  const travellers = g.players.filter(isTraveller);
+  const selP = g.players.find((p) => p.id === sel);
+  const editP = g.players.find((p) => p.id === editing);
+  const check = checkSetup(regular.length, regular.map((p) => p.role));
+  useEffect(() => { if (sel && !selP) setSel(null); }, [g.players.length]);
+
+  const onTap = (id: string) => {
+    const p = g.players.find((x) => x.id === id)!;
+    if (!selP || sel === id) { setSel(sel === id ? null : id); return; }
+    // A Traveller has their own character: they are moved, not swapped.
+    if (isTraveller(selP) || isTraveller(p)) { setSel(id); return; }
+    update((d) => { swapCharacters(d, selP.id, id); prepareSecrets(d); });
+    setSel(null);
+  };
+  const center: [string, string, string?] = [
+    review ? T('Vérification', 'Review') : T('Placement', 'Seating'),
+    `${g.players.length} ${T('places · sens horaire', 'seats · clockwise')}`,
+    selP ? T('Touchez une autre place pour échanger', 'Tap another seat to swap') : T('Touchez deux places pour échanger', 'Tap two seats to swap'),
+  ];
+
+  return (
+    <div class="table-step">
+      <div class="table-circle">
+        <Circle game={g} hidden={false} onTap={onTap} overlay={{ center, noDim: true, links: [], hl: selP ? { [selP.id]: isTraveller(selP) ? T('Sélectionné', 'Selected') : T('Échanger avec…', 'Swap with…') } : {} }} />
+      </div>
+      <aside class="table-side">
+        {selP ? (
+          <div class="side-block seat-card">
+            <div class="between">
+              <div class="eyebrow">{T('PLACE', 'SEAT')} {seatNo(g, selP)}</div>
+              <button type="button" class="btn xs" onClick={() => setSel(null)}>{T('Fermer', 'Close')}</button>
+            </div>
+            {review && (
+              <input class="text-input" value={selP.name} placeholder={T('Prénom', 'Name')} aria-label={T('Prénom', 'Name')}
+                onInput={(e) => update((d) => { d.players.find((x) => x.id === selP.id)!.name = (e.target as HTMLInputElement).value; })} />
+            )}
+            {isTraveller(selP)
+              ? <div class="trav-row"><span class={`serif tone-${selP.alignment === 'good' ? 'bon' : 'mal'}`}>✈ {roleName(selP.role)}</span>
+                <button type="button" class="btn xs" onClick={() => update((d) => { d.players = d.players.filter((q) => q.id !== selP.id); })}>{T('Retirer', 'Remove')}</button></div>
+              : <button type="button" class={`role-select tone-${roleSide(selP.role)}`} onClick={() => setEditing(selP.id)}>
+                <RoleIcon role={selP.role} size={18} /><span>{roleName(selP.role)}</span><i>▾</i>
+              </button>}
+            {review && (
+              <div class="grid-2 tight">
+                <button type="button" class="btn sm" onClick={() => update((d) => movePlayer(d, selP.id, -1))}>↺ {T('Place précédente', 'Previous seat')}</button>
+                <button type="button" class="btn sm" onClick={() => update((d) => movePlayer(d, selP.id, 1))}>{T('Place suivante', 'Next seat')} ↻</button>
+              </div>
+            )}
+            <span class="home-note">{review
+              ? T('Touchez une autre place pour échanger les personnages · les flèches déplacent la personne avec son personnage.', 'Tap another seat to swap the characters · the arrows move the person along with their character.')
+              : T('Touchez une autre place pour échanger les personnages.', 'Tap another seat to swap the characters.')}</span>
+          </div>
+        ) : (
+          <div class="side-block">
+            <h2>{review ? T('Tout vérifier', 'Check everything') : T('Qui s’assoit où', 'Who sits where')}</h2>
+            <span class="home-note">{review
+              ? T('Dernier coup d’œil avant les règles : changez un personnage (même hors sélection) pour rééquilibrer, échangez deux places, corrigez un prénom.', 'Last look before the rules: change a character (even outside the selection) to rebalance, swap two seats, fix a name.')
+              : T('Les personnages sont placés au hasard autour de la table. Touchez une place pour la modifier, puis une autre pour échanger.', 'Characters are placed at random around the table. Tap a seat to edit it, then another one to swap.')}</span>
+            <button type="button" class="btn sm" onClick={() => update((d) => autoAssign(d))}><b>{T('Mélanger les places', 'Shuffle the seats')}</b></button>
+          </div>
+        )}
+        {review && (check.ok
+          ? <div class="banner"><i class="bdot amber" /><span><b>{T('Répartition respectée', 'Distribution matches')}</b> — {check.actual.townsfolk} · {check.actual.outsider} · {check.actual.minion} · {check.actual.demon}.</span></div>
+          : <div class="banner warn"><b class="mono">!</b><span><b>{T('Répartition modifiée', 'Distribution changed')} :</b> {check.actual.townsfolk} · {check.actual.outsider} · {check.actual.minion} · {check.actual.demon} ({T('attendu', 'expected')} {check.expected.townsfolk} · {check.expected.outsider} · {check.expected.minion} · {check.expected.demon}).</span></div>)}
+        <SecretsPanel g={g} />
+        {review && (
+          <div class="side-block">
+            <div class="eyebrow">{T('VOYAGEURS', 'TRAVELLERS')}</div>
+            {travellers.map((p) => (
+              <div key={p.id} class="trav-row">
+                <b>{p.name}</b><span class={`serif tone-${p.alignment === 'good' ? 'bon' : 'mal'}`}>{roleName(p.role)}</span>
+                <span class={`tone-${p.alignment === 'good' ? 'bon' : 'mal'} small`}>{p.alignment === 'good' ? T('Bon', 'Good') : T('Maléfique', 'Evil')} · {T('place', 'seat')} {g.players.indexOf(p) + 1}</span>
+                <button type="button" class="icon-btn" aria-label={T('Retirer', 'Remove')} onClick={() => update((d) => { d.players = d.players.filter((q) => q.id !== p.id); })}>×</button>
+              </div>
+            ))}
+            <button type="button" class="btn" onClick={() => setAddTrav(true)}>+ {T('Ajouter un voyageur', 'Add a traveller')}</button>
+          </div>
+        )}
+      </aside>
+      {editP && <SwapModal g={g} p={editP} onClose={() => setEditing(null)} />}
       {addTrav && <AddTravellerModal onClose={() => setAddTrav(false)} />}
+    </div>
+  );
+}
+
+// --- 3. Names, once everyone is seated -------------------------------------------
+
+function NamesStep({ g }: { g: Game }) {
+  const listRef = useRef<HTMLDivElement>(null);
+  const [focus, setFocus] = useState<string | null>(null);
+  // The table is seated by now: characters stay hidden unless the Storyteller asks.
+  const [show, setShow] = useState(false);
+  const inputs = () => [...(listRef.current?.querySelectorAll<HTMLInputElement>('input') ?? [])];
+  const focusNext = (e: KeyboardEvent) => {
+    if (e.key !== 'Enter') return;
+    const all = inputs();
+    const el = e.currentTarget as HTMLInputElement;
+    const next = all[all.indexOf(el) + 1];
+    if (next) next.focus();
+    else el.blur();
+  };
+  const named = g.players.filter((p) => p.name.trim()).length;
+  const center: [string, string, string?] = [`${named}/${g.players.length}`, T('prénoms placés', 'names placed'), T('Touchez une place pour saisir le prénom', 'Tap a seat to type the name')];
+  return (
+    <div class="table-step">
+      <div class="table-circle">
+        <Circle game={g} hidden={!show} overlay={{ center, noDim: true, links: [], hl: focus ? { [focus]: '✎' } : {} }}
+          onTap={(id) => inputs().find((i) => i.dataset.id === id)?.focus()} />
+      </div>
+      <aside class="table-side">
+        <div class="between">
+          <div class="stack-xs"><h2>{T('Prénoms', 'Names')}</h2><span class="home-note">{T('Une fois tout le monde installé · sens horaire', 'Once everyone is seated · clockwise')}</span></div>
+          <button type="button" class="btn sm" onClick={() => update((d) => randomNames(d))}>{T('Noms au hasard', 'Random names')}</button>
+        </div>
+        <div class="name-list" ref={listRef}>
+          {g.players.map((p, i) => (
+            <label key={p.id} class={`seat-row ${focus === p.id ? 'over' : ''}`}>
+              <span class="mono muted">{String(i + 1).padStart(2, '0')}</span>
+              {show && <span class={`name-role tone-${roleSide(p.role)}`}><RoleIcon role={p.role} size={16} /><span>{roleName(p.role)}</span></span>}
+              <input class="seat-input" data-id={p.id} value={p.name} placeholder={T('Prénom', 'Name')} enterkeyhint="next" onKeyDown={focusNext}
+                onFocus={() => setFocus(p.id)} onBlur={() => setFocus((f) => (f === p.id ? null : f))}
+                onInput={(e) => update((d) => { d.players[i].name = (e.target as HTMLInputElement).value; })} />
+            </label>
+          ))}
+        </div>
+        <button type="button" class="btn sm" onClick={() => setShow(!show)}>{show ? T('Masquer les personnages', 'Hide the characters') : T('Afficher les personnages', 'Show the characters')}</button>
+        <div class="dashed-hint">{T('Entrée passe au suivant · tous les prénoms sont nécessaires pour continuer', 'Enter jumps to the next one · every name is needed to go on')}</div>
+      </aside>
     </div>
   );
 }
@@ -420,7 +460,7 @@ function SwapModal(props: { g: Game; p: Player; onClose: () => void }) {
   };
 
   return (
-    <Modal wide onClose={props.onClose} title={`${T('Rôle de', 'Character for')} ${p.name}`}>
+    <Modal wide onClose={props.onClose} title={`${T('Rôle de', 'Character for')} ${seatLabel(g, p)}`}>
       <div class="between"><span class="home-note">{T('actuellement', 'currently')} {roleName(p.role)}</span>
         <button type="button" class="btn xs" onClick={() => setAll(!all)}>{all ? T('Rôles choisis', 'Chosen characters') : T('Tous les rôles', 'All characters')}</button></div>
       <div class="swap-grid">
@@ -429,16 +469,16 @@ function SwapModal(props: { g: Game; p: Player; onClose: () => void }) {
           return (
             <button type="button" key={r} class={`swap-tile tone-${roleSide(r)} ${sel === r ? 'on' : ''}`} onClick={() => setSel(r)}>
               <span class="serif">{roleName(r)}</span>
-              <span class="small">{r === p.role ? T('actuel', 'current') : h ? h.name : T('libre', 'free')}{sel === r && r !== p.role ? ` · ${T('sélectionné', 'selected')}` : ''}</span>
+              <span class="small">{r === p.role ? T('actuel', 'current') : h ? seatLabel(g, h) : T('libre', 'free')}{sel === r && r !== p.role ? ` · ${T('sélectionné', 'selected')}` : ''}</span>
             </button>
           );
         })}
       </div>
-      {!all && <div class="home-note">{T('Seuls les rôles sélectionnés à l’étape 2 sont proposés · « Tous les rôles » pour élargir', 'Only the characters picked in step 2 are offered · “All characters” to widen')}</div>}
+      {!all && <div class="home-note">{T('Seuls les rôles sélectionnés à l’étape 1 sont proposés · « Tous les rôles » pour élargir ou rééquilibrer', 'Only the characters picked in step 1 are offered · “All characters” to widen or rebalance')}</div>}
       {sel !== p.role && (
         <div class="swap-summary"><span class="mono amber-text">⇄</span><span>
-          {p.name} {T('devient', 'becomes')} <b class={`tone-${roleSide(sel)}`}>{roleName(sel)}</b>
-          {other && <>, {other.name} {T('devient', 'becomes')} <b class={`tone-${roleSide(p.role)}`}>{roleName(p.role)}</b></>}.
+          {seatLabel(g, p)} {T('devient', 'becomes')} <b class={`tone-${roleSide(sel)}`}>{roleName(sel)}</b>
+          {other && <>, {seatLabel(g, other)} {T('devient', 'becomes')} <b class={`tone-${roleSide(p.role)}`}>{roleName(p.role)}</b></>}.
         </span></div>
       )}
       <div class="grid-2">
@@ -449,11 +489,9 @@ function SwapModal(props: { g: Game; p: Player; onClose: () => void }) {
   );
 }
 
-// --- 4. Hand out ----------------------------------------------------------------
+// --- 5. Rules, read aloud -------------------------------------------------------
 
-// --- 4. Rules, read aloud -------------------------------------------------------
-
-function RulesStep() {
+function RulesStep(props: { onSkip: () => void }) {
   return (
     <div class="rules-step">
       <div class="rules-card">
@@ -462,38 +500,65 @@ function RulesStep() {
         <p class="modal-text">{T('Les personnages sont attribués, mais personne ne les a encore vus. Racontez l’histoire de Ravenswood Bluff et expliquez les règles : la présentation affiche les diapositives et le texte à lire. Ensuite, chacun découvre son personnage.',
           'Characters are assigned, but nobody has seen them yet. Tell the story of Ravenswood Bluff and explain the rules: the presentation shows the slides and the script. Then everyone discovers their character.')}</p>
         <button type="button" class="btn amber lg" onClick={() => openBriefing()}>{T('Lancer la présentation', 'Start the presentation')}</button>
-        <div class="home-note">{T('Table habituée ? Passez directement à la distribution avec « Suivant ».', 'Seasoned table? Go straight to the hand-out with “Next”.')}</div>
+        <button type="button" class="btn" onClick={props.onSkip}>{T('Passer les règles', 'Skip the rules')} →</button>
+        <div class="home-note">{T('Table habituée ? « Passer les règles » mène directement à la distribution.', 'Seasoned table? “Skip the rules” goes straight to the hand-out.')}</div>
       </div>
     </div>
   );
 }
 
-// --- 5. Hand out ----------------------------------------------------------------
+// --- 6. Hand out ----------------------------------------------------------------
+
+type SeatState = { claimed?: boolean; seen?: boolean };
 
 function DistributeStep({ g }: { g: Game }) {
+  const phones = g.phoneDeal !== false;
+  const { room } = useLive();
+  // The QR code needs a live room: opened as soon as the phones are chosen.
+  useEffect(() => { if (phones && !room) void startLive(); }, [phones, !room]);
+  return phones && room ? <PhoneDistribute g={g} code={room.code} /> : <DistBoard g={g} seats={null} />;
+}
+
+/** Who has picked their name on a phone, and who has seen their character, live. */
+function PhoneDistribute(props: { g: Game; code: string }) {
+  const { g } = props;
+  const { data } = useRoom(props.code);
+  const seats = data?.seats?.gameId === g.id ? data.seats : null;
+  // A character seen on a phone counts as seen in the Grimoire.
+  useEffect(() => {
+    const ids = (seats?.players ?? []).filter((s) => s.seen && !g.players.find((p) => p.id === s.id)?.seen).map((s) => s.id);
+    if (ids.length) update((d) => { for (const p of d.players) if (ids.includes(p.id)) p.seen = true; });
+  }, [seats]);
+  return <DistBoard g={g} seats={Object.fromEntries((seats?.players ?? []).map((s) => [s.id, s]))} />;
+}
+
+/** The hand-out on the (hidden) circle: tap a player to hand them the iPad; those who have seen their character fade. */
+function DistBoard(props: { g: Game; seats: Record<string, SeatState> | null }) {
+  const { g, seats } = props;
   const phones = g.phoneDeal !== false;
   const { room, status } = useLive();
   const seen = g.players.filter((p) => p.seen).length;
   const nextP = g.players.find((p) => !p.seen);
   const show = (p: Player) => revealRole(p, () => update((d) => { d.players.find((x) => x.id === p.id)!.seen = true; }));
-  // The QR code needs a live room: opened as soon as the phones are chosen.
-  useEffect(() => { if (phones && !room) void startLive(); }, [phones, !room]);
+  const claimed = g.players.filter((p) => seats?.[p.id]?.claimed && !p.seen);
+  // Highlighted: whoever is looking right now (phone) or is next (iPad). Faded: those who have seen their character.
+  const hl: Record<string, string> = Object.fromEntries(claimed.map((p) => [p.id, `📱 ${T('Identifié·e', 'Identified')}`]));
+  if (!seats && nextP) hl[nextP.id] = T('Suivant', 'Next');
+  const center: [string, string, string?] = [`${seen}/${g.players.length}`, T('ont vu leur rôle', 'have seen their character'),
+    phones && seats ? T('Touchez un joueur sans téléphone pour lui passer l’iPad', 'Tap a player without a phone to hand them the iPad') : T('Touchez un joueur pour lui passer l’iPad', 'Tap a player to hand them the iPad')];
 
   return (
-    <div class="dist-step">
-      <div class="dist-main">
+    <div class="table-step dist-step">
+      <div class="table-circle">
+        <Circle game={g} hidden overlay={{ center, hl, links: [], noDim: true, faded: g.players.filter((p) => p.seen).map((p) => p.id) }} onTap={(id) => show(g.players.find((p) => p.id === id)!)} />
+      </div>
+      <aside class="table-side dist-side">
         <Seg value={phones ? 'phones' : 'ipad'} onChange={(v) => update((d) => { d.phoneDeal = v === 'phones'; })}
-          options={[{ v: 'phones', label: T('Sur les téléphones (QR code)', 'On the phones (QR code)') }, { v: 'ipad', label: T('En passant l’iPad', 'Passing the iPad') }]} />
+          options={[{ v: 'phones', label: T('Sur les téléphones', 'On the phones') }, { v: 'ipad', label: T('En passant l’iPad', 'Passing the iPad') }]} />
         <div class="dist-head">
           <h2>{seen} {T('sur', 'of')} {g.players.length} {T('ont vu leur rôle', 'have seen their character')}</h2>
           <div class="progress"><div style={{ width: `${(seen / g.players.length) * 100}%` }} /></div>
         </div>
-        {phones && room ? <PhoneSeats g={g} code={room.code} onShow={show} /> : <IpadSeats g={g} onShow={show} />}
-        <div class="home-note">{phones
-          ? T('Sans téléphone ? Touchez son nom pour lui passer l’iPad. « Libérer » si quelqu’un s’est trompé de prénom.', 'No phone? Tap their name to hand them the iPad. “Free” if someone picked the wrong name.')
-          : T('Toucher un joueur pour lui passer l’iPad hors ordre, ou pour lui remontrer son rôle.', 'Tap a player to hand them the iPad out of order, or to show their character again.')}</div>
-      </div>
-      <aside class="dist-side">
         {phones ? (
           room ? (
             <>
@@ -501,14 +566,22 @@ function DistributeStep({ g }: { g: Game }) {
               <div class="qr-box"><QrCode text={liveUrl(room.code)} size={200} label={T('QR code pour découvrir son personnage', 'QR code to discover your character')} /></div>
               <div class="live-code">{room.code}</div>
               <div class={`live-status ${status}`}><i class={`live-dot ${status === 'ok' ? 'on' : ''}`} />{status === 'ok' ? T('En ligne : les téléphones voient les prénoms', 'Online: phones see the names') : status === 'error' ? T('Relais injoignable : passez l’iPad', 'Relay unreachable: pass the iPad') : T('Connexion…', 'Connecting…')}</div>
+              {claimed.map((p) => (
+                <div key={p.id} class="dist-row next">
+                  <span class="dist-name">📱 {p.name}</span>
+                  <span class="dist-state amber-text">{T('Identifié·e · regarde…', 'Identified · looking…')}</span>
+                  <button type="button" class="btn xs" onClick={() => void releaseSeat(p.id)}>{T('Libérer', 'Free')}</button>
+                </div>
+              ))}
+              <div class="home-note">{T('Sans téléphone ? Touchez son nom sur le cercle pour lui passer l’iPad. « Libérer » si quelqu’un s’est trompé de prénom.', 'No phone? Tap their name on the circle to hand them the iPad. “Free” if someone picked the wrong name.')}</div>
             </>
           ) : <div class="small muted">{T('Ouverture…', 'Opening…')}</div>
         ) : (
           <>
-            <p class="side-text">{T('Tendez l’iPad au joueur. Un écran neutre s’affiche, il appuie longuement pour voir son personnage, puis le rend.', 'Hand the iPad to the player. A neutral screen appears; they press and hold to see their character, then hand it back.')}</p>
+            <p class="side-text">{T('Tendez l’iPad au joueur. Un écran neutre s’affiche, il appuie longuement pour voir son personnage, puis le rend. Touchez un joueur sur le cercle pour le servir hors ordre ou lui remontrer son rôle.', 'Hand the iPad to the player. A neutral screen appears; they press and hold to see their character, then hand it back. Tap a player on the circle to serve them out of order or show their character again.')}</p>
             {nextP ? (
               <>
-                <div class="next-card"><div class="eyebrow">{T('SUIVANT', 'NEXT')}</div><div class="next-name">{nextP.name}</div><div class="home-note">{T('Place', 'Seat')} {String(g.players.indexOf(nextP) + 1).padStart(2, '0')}</div></div>
+                <div class="next-card"><div class="eyebrow">{T('SUIVANT', 'NEXT')}</div><div class="next-name">{nextP.name}</div><div class="home-note">{T('Place', 'Seat')} {seatNo(g, nextP)}</div></div>
                 <button type="button" class="btn amber lg" onClick={() => show(nextP)}>{T('Passer l’iPad à', 'Hand the iPad to')} {nextP.name}</button>
               </>
             ) : (
@@ -517,58 +590,6 @@ function DistributeStep({ g }: { g: Game }) {
           </>
         )}
       </aside>
-    </div>
-  );
-}
-
-function IpadSeats(props: { g: Game; onShow: (p: Player) => void }) {
-  const { g } = props;
-  const nextP = g.players.find((p) => !p.seen);
-  return (
-    <div class="dist-grid">
-      {g.players.map((p, i) => {
-        const isNext = p.id === nextP?.id;
-        return (
-          <button type="button" key={p.id} class={`dist-row ${isNext ? 'next' : ''}`} onClick={() => props.onShow(p)}>
-            <i class={`seen-dot ${p.seen ? 'on' : ''}`} />
-            <span class="mono muted">{String(i + 1).padStart(2, '0')}</span>
-            <span class="dist-name">{p.name}</span>
-            <span class={`dist-state ${p.seen ? 'muted' : isNext ? 'amber-text' : ''}`}>{p.seen ? T('A vu son rôle', 'Has seen it') : isNext ? T('Suivant', 'Next') : T('À voir', 'To see')}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-/** Who has picked their name on a phone, and who has seen their character, live. */
-function PhoneSeats(props: { g: Game; code: string; onShow: (p: Player) => void }) {
-  const { g } = props;
-  const { data } = useRoom(props.code);
-  const seats = data?.seats?.gameId === g.id ? data.seats : null;
-  const state = (id: string) => seats?.players.find((s) => s.id === id);
-  // A character seen on a phone counts as seen in the Grimoire.
-  useEffect(() => {
-    const ids = (seats?.players ?? []).filter((s) => s.seen && !g.players.find((p) => p.id === s.id)?.seen).map((s) => s.id);
-    if (ids.length) update((d) => { for (const p of d.players) if (ids.includes(p.id)) p.seen = true; });
-  }, [seats]);
-  return (
-    <div class="dist-grid">
-      {g.players.map((p, i) => {
-        const s = state(p.id);
-        const label = p.seen ? T('A vu son rôle', 'Has seen it') : s?.claimed ? T('Identifié·e · regarde…', 'Identified · looking…') : T('En attente', 'Waiting');
-        return (
-          <div key={p.id} class={`dist-row phone ${s?.claimed && !p.seen ? 'next' : ''}`}>
-            <button type="button" class="dist-row-main" onClick={() => props.onShow(p)} aria-label={`${T('Passer l’iPad à', 'Hand the iPad to')} ${p.name}`}>
-              <i class={`seen-dot ${p.seen ? 'on' : ''}`} />
-              <span class="mono muted">{String(i + 1).padStart(2, '0')}</span>
-              <span class="dist-name">{p.name}</span>
-              <span class={`dist-state ${p.seen ? 'muted' : s?.claimed ? 'amber-text' : ''}`}>{s?.claimed ? '📱 ' : ''}{label}</span>
-            </button>
-            {s?.claimed && <button type="button" class="btn xs" onClick={() => void releaseSeat(p.id)}>{T('Libérer', 'Free')}</button>}
-          </div>
-        );
-      })}
     </div>
   );
 }

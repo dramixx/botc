@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ROLES, type RoleId } from '../data/roles';
 import {
-  autoAssign, chefNumber, checkSetup, numberOptions, completeRoles, completeStep, reorderPlayer, currentStep, demoGame, empathNumber, endDay,
+  autoAssign, dealRoles, swapCharacters, setupStepOf, chefNumber, checkSetup, numberOptions, completeRoles, completeStep, reorderPlayer, currentStep, demoGame, empathNumber, endDay,
   fortuneAnswer, newGame, rerollTeam, nightHistory, nightSteps, nominate, randomRoles, recordVote, setRole, slayerShot,
   startDay, startNight, uncompleteStep, aliveCount, byId, executeNow, starpassHeir, addMarker, impKill, hasMarker, addTraveller, votesNeeded, voteWeight, infoConflicts,
 } from './engine';
@@ -43,6 +43,50 @@ describe('setup helpers', () => {
     const ids = g.players.map((p) => p.id);
     reorderPlayer(g, ids[0], 3);
     expect(g.players.map((p) => p.id)).toEqual([ids[1], ids[2], ids[3], ids[0], ids[4], ids[5]]);
+  });
+});
+
+describe('circle setup', () => {
+  it('new seats start without a name, on the characters step', () => {
+    const g = newGame({ count: 7 });
+    expect(g.setupStep).toBe('roles');
+    expect(g.players.every((p) => p.name === '')).toBe(true);
+  });
+
+  it('dealRoles shuffles the first time, then keeps the characters already seated', () => {
+    const g = newGame({ count: 8 });
+    g.selectedRoles = randomRoles(8, seeded('d1'));
+    dealRoles(g, seeded('d2'));
+    expect(g.players.map((p) => p.role).sort()).toEqual([...g.selectedRoles].sort());
+    const before = g.players.map((p) => p.role);
+    // One character is replaced by another of the same team: only that seat changes.
+    const out = before.find((r) => ROLES[r].team === 'townsfolk' && r !== 'fortuneteller')!;
+    const fresh = Object.values(ROLES).find((r) => r.team === 'townsfolk' && !before.includes(r.id) && r.id !== 'fortuneteller' && r.id !== g.players.find((p) => p.role === 'drunk')?.believedRole)!.id;
+    g.selectedRoles = g.selectedRoles.map((r) => (r === out ? fresh : r));
+    dealRoles(g, seeded('d3'));
+    expect(g.players.map((p) => p.role)).toEqual(before.map((r) => (r === out ? fresh : r)));
+  });
+
+  it('swapCharacters swaps characters and reminders, not names or seats', () => {
+    const g = gameWith(['imp', 'drunk', 'fortuneteller', 'empath', 'chef']);
+    g.players[1].believedRole = 'monk';
+    addMarker(P(g, 3), 'redherring');
+    const ids = g.players.map((p) => p.id);
+    swapCharacters(g, ids[0], ids[1]);
+    expect([P(g, 0).name, P(g, 0).role, P(g, 0).alignment, P(g, 0).believedRole]).toEqual(['P0', 'drunk', 'good', 'monk']);
+    expect([P(g, 1).name, P(g, 1).role, P(g, 1).alignment, 'believedRole' in P(g, 1)]).toEqual(['P1', 'imp', 'evil', false]);
+    swapCharacters(g, ids[3], ids[4]);
+    expect(hasMarker(P(g, 4), 'redherring')).toBe(true);
+    expect(hasMarker(P(g, 3), 'redherring')).toBe(false);
+    expect(g.players.map((p) => p.id)).toEqual(ids);
+  });
+
+  it('games saved with the former steps resume on their new equivalent', () => {
+    const g = newGame();
+    (g as { setupStep: string }).setupStep = 'players';
+    expect(setupStepOf(g)).toBe('roles');
+    (g as { setupStep: string }).setupStep = 'assign';
+    expect(setupStepOf(g)).toBe('review');
   });
 });
 

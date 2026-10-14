@@ -3,7 +3,7 @@ import { useEffect, useState } from 'preact/hooks';
 import {
   ADVICE, RULES, START_STEPS, STORY, briefingSlides, type Block, type BriefingCtx, type StartAction, type Topic,
 } from '../data/guide';
-import { checkSetup, isTraveller } from '../game/engine';
+import { checkSetup, isTraveller, setupStepOf } from '../game/engine';
 import { update, useStore } from '../game/store';
 import { PACE_NAMES, getPrefs, recommended, setPrefs, useTimer, type Pace } from '../game/timer';
 import type { L10n } from '../data/roles';
@@ -172,7 +172,7 @@ function Briefing(props: { withGame: boolean; onClose: () => void }) {
   const slides = briefingSlides(ctx);
   const s = slides[Math.min(i, slides.length - 1)];
   const last = i >= slides.length - 1;
-  const canDistribute = game?.phase === 'setup' && ['assign', 'rules', 'distribute'].includes(game.setupStep);
+  const canDistribute = game?.phase === 'setup' && ['review', 'rules', 'distribute'].includes(setupStepOf(game));
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

@@ -237,25 +237,37 @@ textarea.notes { width: 100%; min-height: 64px; padding: 12px 14px; border: 0; b
 .step-pill.done .step-num { background: oklch(0.32 0.012 60); }
 .step-label { font-size: 14px; font-weight: 600; }
 .setup-body { flex: 1; min-height: 0; overflow: auto; }
+/* Six steps: on a tablet the title gives way first, then the labels of the steps other than the current one. */
+@media (orientation: landscape) and (max-width: 1400px) { .setup-bar-title { display: none; } }
+@media (max-width: 1100px) { .step-pill:not(.cur) .step-label { display: none; } .step-pill:not(.cur) { padding-right: 6px; } }
 
-.players-step { display: grid; grid-template-columns: 440px 1fr; min-height: 100%; }
-.players-left { padding: 32px; display: flex; flex-direction: column; gap: 28px; border-right: 1px solid var(--line); }
-.big-stepper { display: flex; align-items: center; justify-content: space-between; padding: 10px; border-radius: 18px; background: var(--surface); }
-.big-stepper-value { font: 600 72px/1 var(--serif); }
 .distrib { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .distrib-cell { padding: 14px 6px; border-radius: 14px; background: var(--surface); display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .distrib-num { font: 700 40px/1 var(--serif); }
 .distrib-label { font-size: 12.5px; color: oklch(0.8 0.015 75); }
-.players-right { padding: 28px 32px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.players-right h2, .assign-main h2, .dist-head h2 { font: 600 28px var(--serif); }
-.seat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.table-side h2, .dist-head h2 { font: 600 28px var(--serif); }
 .seat-row { min-height: 58px; display: flex; align-items: center; gap: 10px; padding: 0 8px 0 14px; border-radius: 14px; background: oklch(0.205 0.01 60); border: 1px solid oklch(0.28 0.012 60); }
-.seat-row.dragging { opacity: 0.5; }
 .seat-row.over { border-color: var(--amber); }
 .seat-input { min-height: 44px; flex: 1; min-width: 0; padding: 0; background: transparent; border: 0; font-size: 16px; font-weight: 500; }
-.handle { width: 44px; height: 44px; display: grid; place-items: center; font-size: 20px; color: var(--ink3); cursor: grab; flex: none; }
 
 .roles-step { padding: 18px 28px 28px; display: flex; flex-direction: column; gap: 14px; }
+.roles-head { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.roles-head .field:first-child { flex: 1; min-width: 220px; }
+.count-stepper { display: flex; align-items: center; gap: 10px; padding: 4px; border-radius: 14px; background: var(--surface); }
+.count-stepper-value { min-width: 48px; text-align: center; font: 600 36px/1 var(--serif); }
+.roles-help { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Seating, names, review and hand-out: the table as a circle, with a side panel. */
+.table-step { display: grid; grid-template-columns: 1fr clamp(360px, 34vw, 440px); height: 100%; }
+.table-circle { position: relative; min-width: 0; min-height: 0; container-type: size; }
+.table-side { min-height: 0; overflow-y: auto; background: oklch(0.195 0.01 60); border-left: 1px solid var(--line); padding: 22px 24px; display: flex; flex-direction: column; gap: 18px; }
+.seat-card { padding: 14px; border-radius: 16px; background: var(--bg); border: 1.5px solid var(--amber); }
+.name-list { display: flex; flex-direction: column; gap: 6px; }
+.name-list .seat-row { min-height: 52px; }
+.name-role { display: inline-flex; align-items: center; gap: 6px; max-width: 40%; flex: none; color: var(--tone); font: 600 15px var(--serif); white-space: nowrap; overflow: hidden; }
+.name-role span { overflow: hidden; text-overflow: ellipsis; }
+.pname.unnamed { color: var(--ink3); font-style: italic; font-weight: 400; }
+.dist-row .dist-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .style-pick { display: flex; flex-direction: column; gap: 8px; }
 .style-pick-label { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink3); }
 .roles-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -289,18 +301,9 @@ textarea.notes { width: 100%; min-height: 64px; padding: 12px 14px; border: 0; b
 .role-picker { display: flex; flex-wrap: wrap; gap: 8px; }
 .role-picker .role-chip { min-height: 48px; min-width: 120px; }
 
-.assign-step { display: grid; grid-template-columns: 1fr 440px; min-height: 100%; }
-.assign-main { padding: 22px 28px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.assign-rows { display: flex; flex-direction: column; gap: 6px; }
-.assign-row { min-height: 52px; display: flex; align-items: center; gap: 14px; padding: 0 8px 0 14px; border-radius: 12px; background: oklch(0.205 0.01 60); }
-.seat-n { width: 20px; font-size: 12px; }
-.assign-name { width: 120px; font-size: 15.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.assign-note { flex: 1; font-size: 13px; color: var(--ink3); }
-.assign-note.tone-mal { color: var(--evil); }
 .role-select { min-height: 40px; min-width: 190px; padding: 0 14px; border-radius: 10px; border: 1.5px solid var(--tone); background: transparent; color: var(--tone); display: flex; align-items: center; gap: 8px; font: 600 18px var(--serif); text-align: left; }
 .role-select span { flex: 1; }
 .role-select i { font-style: normal; font-size: 12px; color: var(--ink3); font-family: var(--sans); }
-.assign-side { background: oklch(0.195 0.01 60); border-left: 1px solid var(--line); padding: 22px 24px; display: flex; flex-direction: column; gap: 18px; }
 .side-block { display: flex; flex-direction: column; gap: 8px; }
 .field-btn { min-height: 52px; padding: 0 16px; border-radius: 12px; border: 1.5px solid var(--tone, transparent); background: transparent; display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left; font-size: 14px; }
 .field-btn .serif { font-size: 20px; color: var(--tone); }
@@ -322,19 +325,13 @@ textarea.notes { width: 100%; min-height: 64px; padding: 12px 14px; border: 0; b
 .swap-summary { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 14px; background: var(--bg); font-size: 15px; line-height: 1.45; }
 .swap-summary .mono { font-size: 20px; }
 
-.dist-step { display: grid; grid-template-columns: 1fr 420px; min-height: 100%; }
-.dist-main { padding: 24px 28px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .dist-head { display: flex; align-items: center; gap: 16px; }
 .progress { flex: 1; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
 .progress div { height: 100%; background: var(--amber); }
-.dist-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .dist-row { min-height: 64px; display: flex; align-items: center; gap: 14px; padding: 0 16px; border-radius: 14px; background: var(--row); border: 1.5px solid transparent; text-align: left; }
 .dist-row.next { background: oklch(0.8 0.12 75 / 0.12); border-color: var(--amber); }
-.seen-dot { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid oklch(0.45 0.012 70); flex: none; }
-.seen-dot.on { background: var(--amber); border-color: var(--amber); }
 .dist-name { flex: 1; font-size: 16px; font-weight: 600; }
 .dist-state { font-size: 13px; font-weight: 500; color: oklch(0.85 0.015 80); }
-.dist-side { background: oklch(0.195 0.01 60); border-left: 1px solid var(--line); padding: 28px; display: flex; flex-direction: column; gap: 16px; justify-content: flex-end; }
 .side-text { font-size: 15px; line-height: 1.55; color: var(--ink2); }
 .next-card { padding: 16px; border-radius: 14px; background: var(--bg); display: flex; flex-direction: column; gap: 4px; }
 .next-name { font: 600 34px var(--serif); }
@@ -559,9 +556,9 @@ textarea.notes { width: 100%; min-height: 64px; padding: 12px 14px; border: 0; b
   .step-chips { flex-wrap: nowrap; overflow-x: auto; }
   .home { grid-template-columns: 1fr; }
   .home-right { border-left: 0; border-top: 1px solid var(--line); }
-  .players-step, .assign-step, .dist-step, .end-screen { grid-template-columns: 1fr; }
-  .players-left { border-right: 0; border-bottom: 1px solid var(--line); }
-  .assign-side, .dist-side { border-left: 0; border-top: 1px solid var(--line); }
+  .end-screen { grid-template-columns: 1fr; }
+  .table-step { grid-template-columns: 1fr; grid-template-rows: min(100vw, 58dvh) auto; height: auto; }
+  .table-side { overflow: visible; border-left: 0; border-top: 1px solid var(--line); }
   .end-left { border-right: 0; }
   .steps { display: none; }
   .setup-bar-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -573,7 +570,7 @@ textarea.notes { width: 100%; min-height: 64px; padding: 12px 14px; border: 0; b
   .setup-bar .btn { flex: none; padding-inline: 12px; }
 }
 @media (max-width: 760px) {
-  .tiles, .seat-grid, .dist-grid { grid-template-columns: 1fr; }
+  .tiles { grid-template-columns: 1fr; }
   .home-left, .home-right { padding: 24px 18px; }
   .swap-grid { grid-template-columns: repeat(2, 1fr); }
   .end-title { font-size: 56px; }
@@ -930,8 +927,6 @@ textarea.notes { width: 100%; min-height: 64px; padding: 12px 14px; border: 0; b
 /* ---- setup: rules read aloud, characters on the phones --------------------------------------- */
 .rules-step { min-height: 100%; display: grid; place-items: center; padding: 24px 16px; }
 .rules-card { width: min(620px, 100%); display: flex; flex-direction: column; gap: 18px; padding: 28px; border-radius: 22px; background: var(--panel); border: 1px solid var(--line); }
-.dist-row.phone { padding: 0 12px 0 0; }
-.dist-row-main { flex: 1; min-width: 0; min-height: 64px; display: flex; align-items: center; gap: 14px; padding: 0 0 0 16px; background: none; border: 0; color: inherit; font: inherit; text-align: left; }
 .dist-side .qr-box { margin-top: 4px; }
 
 /* Phone / TV: "who are you?" then the character. */

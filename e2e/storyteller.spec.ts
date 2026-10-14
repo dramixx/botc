@@ -113,11 +113,11 @@ test.describe('hand-out on the phones', () => {
     await phone.locator('.deal-row', { hasText: 'Joueur3' }).click();
     await phone.getByRole('button', { name: 'Oui, c’est moi' }).click();
     await expect(phone.locator('.showcard.privacy')).toBeVisible();
-    await expect(page.locator('.dist-row', { hasText: 'Joueur3' })).toContainText('Identifié');
+    await expect(token(page, 'Joueur3')).toContainText('Identifié');
     await phone.locator('.hold').focus();
     await phone.keyboard.press('Enter');
     await expect(phone.locator('.reveal-disc')).toContainText(ROLES.washerwoman.name.fr);
-    await expect(page.locator('.dist-row', { hasText: 'Joueur3' })).toContainText('A vu son rôle');
+    await expect(token(page, 'Joueur3')).toHaveClass(/faded/);
     await expect.poll(async () => (await savedGame(page)).players[2].seen).toBe(true);
 
     // Another phone cannot take the same name.
@@ -156,7 +156,7 @@ test.describe('hand-out on the phones', () => {
 
 test('setup: the rules are presented between the assignment and the hand-out', async ({ page }) => {
   const g = makeGame(TABLE8, { phase: 'setup' });
-  g.setupStep = 'assign';
+  g.setupStep = 'review';
   await openSetup(page, g);
   await page.locator('.setup-bar .btn.next').click();
   await expect(page.locator('.step-pill.cur')).toContainText('Règles');
