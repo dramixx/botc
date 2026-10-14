@@ -12,8 +12,8 @@ import { useIconTheme } from './data/icons';
 import { initAccess, useAccess } from './game/access';
 import { initLive, liveCodeFromHash } from './game/liveClient';
 import { loadInitial, useStore } from './game/store';
-import { getLang, useLang } from './i18n';
-import { initUpdates, useStale } from './update';
+import { getLang, T, useLang } from './i18n';
+import { initUpdates, type UpdateStatus, useUpdate } from './update';
 import '@fontsource/cormorant-garamond/500.css';
 import '@fontsource/cormorant-garamond/600.css';
 import '@fontsource/cormorant-garamond/700.css';
@@ -31,6 +31,22 @@ const VERSION = `v${__APP_VERSION__} · ${pad(built.getDate())}/${pad(built.getM
 /** App version and build time, barely visible: to check the iPad picked up the latest update. */
 const AppVersion = () => <div class="app-version" aria-hidden="true">{VERSION}</div>;
 
+/** Tells the storyteller a newer build is being fetched or is waiting for the home page. */
+const UpdateBanner = ({ status, onHome }: { status: UpdateStatus; onHome: boolean }) => {
+  if (status === 'idle') return null;
+  const text = status === 'downloading'
+    ? T('Mise à jour en cours…', 'Updating…')
+    : onHome
+      ? T('Mise à jour installée, redémarrage…', 'Update installed, restarting…')
+      : T('Nouvelle version prête : elle s’appliquera au retour à l’accueil', 'New version ready: it will apply when you return home');
+  return (
+    <div class="update-banner" role="status">
+      <span>{text}</span>
+      {status === 'downloading' && <i class="update-bar" />}
+    </div>
+  );
+};
+
 function App() {
   useLang();
   useIconTheme();
@@ -40,7 +56,7 @@ function App() {
   const [ready, setReady] = useState(false);
   const [screen, setScreen] = useState<'home' | 'game'>('home');
   const [resumed, setResumed] = useState(false);
-  const stale = useStale();
+  const update = useUpdate();
   // Players open the public sheet (#fiche) on their own phones: no game is loaded or shown.
   const [handout, setHandout] = useState(isHandoutHash(location.hash));
   // The TV and the players' phones follow the live view (#live/CODE): public information only, no game loaded.
@@ -65,19 +81,19 @@ function App() {
   }, [ready]);
   // A newer build is applied only on the home page, never during a game, the player sheet or the live view.
   const onHome = ready && resumed && access !== 'checking' && access !== 'locked' && !live && !handout && screen === 'home';
-  useEffect(() => { if (stale && onHome) location.reload(); }, [stale, onHome]);
+  useEffect(() => { if (update === 'ready' && onHome) location.reload(); }, [update, onHome]);
 
-  if (live) return <><LiveView code={live} /><AppVersion /></>;
-  if (handout) return <><Handout /><ToastHost /><AppVersion /></>;
+  if (live) return <><LiveView code={live} /><AppVersion /><UpdateBanner status={update} onHome={onHome} /></>;
+  if (handout) return <><Handout /><ToastHost /><AppVersion /><UpdateBanner status={update} onHome={onHome} /></>;
   if (!ready || access === 'checking') return <div class="loading"><div class="halo" /></div>;
-  if (access === 'locked') return <><Lock /><ToastHost /><AppVersion /></>;
+  if (access === 'locked') return <><Lock /><ToastHost /><AppVersion /><UpdateBanner status={update} onHome={onHome} /></>;
   return (
     <>
       {screen === 'game' && game ? <Play game={game} onHome={() => setScreen('home')} /> : <Home onOpen={() => setScreen('game')} />}
       <GuideHost />
       <ShowCardHost />
       <ToastHost />
-      <AppVersion />
+      <AppVersion /><UpdateBanner status={update} onHome={onHome} />
     </>
   );
 }
