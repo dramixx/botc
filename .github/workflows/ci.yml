@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Version bumped
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: package.json version differs from the base branch
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if ! git cat-file -e "origin/$BASE_REF:package.json" 2>/dev/null; then
+            echo "No package.json on the base branch yet (initial import): nothing to compare."
+            exit 0
+          fi
+          head=$(node -p "require('./package.json').version")
+          base=$(git show "origin/$BASE_REF:package.json" | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
+          echo "base $base → PR $head"
+          if [ "$head" = "$base" ]; then
+            echo "::error file=package.json::Bump the version (shown at the bottom of the app) in every PR."
+            exit 1
+          fi
+
+  check:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: botc-grimoire-dist
+          path: dist
+          retention-days: 14
+
+  e2e:
+    name: End-to-end (Playwright)
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: botc-grimoire-playwright
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: botc-grimoire:ci
+          cache-from: type=gha,scope=botc-grimoire
+          cache-to: type=gha,mode=max,scope=botc-grimoire
+      - name: Smoke test
+        run: |
+          docker run -d --name botc -p 8080:8080 botc-grimoire:ci
+          trap 'docker logs botc' ERR
+          for i in $(seq 1 20); do curl -fs http://localhost:8080/healthz && break; sleep 1; done
+          curl -fs http://localhost:8080/ | grep -q '<div id="app">'
+          curl -fsI http://localhost:8080/sw.js
+          # Live relay behind nginx (Node starts a moment after nginx): create a room, publish, read it back.
+          for i in $(seq 1 20); do room=$(curl -fs -X POST http://localhost:8080/api/live) && break; sleep 1; done
+          [ -n "$room" ] || { docker logs botc; exit 1; }
+          code=$(echo "$room" | jq -r .code); token=$(echo "$room" | jq -r .token)
+          curl -fs -X PUT -H "Authorization: Bearer $token" -d '{"v":1,"phase":"day"}' "http://localhost:8080/api/live/$code"
+          curl -fs "http://localhost:8080/api/live/$code" | jq -e '.snap.phase == "day"'
+          timeout 3 curl -sN "http://localhost:8080/api/live/$code/events" > sse.txt || true
+          grep -q '^event: state' sse.txt
+          docker rm -f botc
