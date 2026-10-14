@@ -20,7 +20,8 @@ export function initUpdates() {
     void navigator.serviceWorker.register('./sw.js').then((reg) => {
       reg.addEventListener('updatefound', () => {
         const w = reg.installing;
-        if (!w || status === 'ready') return;
+        // The very first install is not an update: nothing to announce.
+        if (!w || status === 'ready' || !navigator.serviceWorker.controller) return;
         set('downloading');
         // A failed install leaves the old build running: drop the indicator.
         w.addEventListener('statechange', () => { if (w.state === 'redundant' && status === 'downloading') set('idle'); });
