@@ -39,12 +39,13 @@ export const START_STEPS: StartStep[] = [
   },
   {
     title: l('Préparer la partie dans l’app', 'Set up the game in the app'), time: l('5 min', '5 min'),
-    text: l('« Nouvelle partie » vous guide en quatre étapes. L’app calcule la répartition officielle et vérifie votre sélection.', '“New game” guides you in four steps. The app computes the official distribution and checks your selection.'),
+    text: l('« Nouvelle partie » vous guide pas à pas, et tout ce qui ne dépend pas des prénoms se prépare à l’avance. L’app calcule la répartition officielle et vérifie votre sélection.', '“New game” guides you step by step, and everything that does not depend on names can be prepared ahead. The app computes the official distribution and checks your selection.'),
     items: [
-      l('Joueurs : le nombre, puis les noms dans l’ordre de la table, dans le sens horaire. L’ordre compte (voisins de l’Empathe, du Cuisinier…).', 'Players: the count, then the names in table order, clockwise. The order matters (Empath’s and Chef’s neighbours…).'),
-      l('Personnages : à la main ou « Tirer au hasard ». Pour une première partie, évitez l’Ivrogne, l’Espion et le Reclus, qui brouillent les informations.', 'Characters: by hand or “Random”. For a first game, avoid the Drunk, the Spy and the Recluse, which muddy information.'),
-      l('Attribution : qui reçoit quoi, le faux rôle de l’Ivrogne, le faux positif de la Voyante, les 3 bluffs du Démon.', 'Assignment: who gets what, the Drunk’s fake character, the Fortune Teller’s red herring, the Demon’s 3 bluffs.'),
-      l('Distribution : à faire après la présentation des règles (étape suivante).', 'Hand out: do it after presenting the rules (next step).'),
+      l('Personnages : le nombre de joueurs, puis les rôles à la main ou « Tirer au hasard ». Pour une première partie, évitez l’Ivrogne, l’Espion et le Reclus, qui brouillent les informations.', 'Characters: the player count, then the characters by hand or “Random”. For a first game, avoid the Drunk, the Spy and the Recluse, which muddy information.'),
+      l('Placement : les personnages sur le cercle, dans le sens horaire (touchez deux places pour les échanger), le faux rôle de l’Ivrogne, le faux positif de la Voyante, les 3 bluffs du Démon. L’ordre compte (voisins de l’Empathe, du Cuisinier…).', 'Seating: the characters on the circle, clockwise (tap two seats to swap them), the Drunk’s fake character, the Fortune Teller’s red herring, the Demon’s 3 bluffs. The order matters (Empath’s and Chef’s neighbours…).'),
+      l('Prénoms : une fois tout le monde installé, le prénom de chaque place.', 'Names: once everyone is seated, the name at each seat.'),
+      l('Vérification : un dernier coup d’œil pour rééquilibrer (changer un rôle, échanger deux places) et ajouter les Voyageurs.', 'Review: a last look to rebalance (change a character, swap two seats) and add Travellers.'),
+      l('Règles puis distribution : présentez les règles (ou passez-les), puis chacun découvre son personnage.', 'Rules then hand-out: present the rules (or skip them), then everyone discovers their character.'),
     ],
     action: { id: 'newgame', label: l('Nouvelle partie', 'New game') },
   },

@@ -100,7 +100,8 @@ export interface LogEntry {
 }
 
 export type Phase = 'setup' | 'night' | 'day' | 'ended';
-export type SetupStep = 'players' | 'roles' | 'assign' | 'rules' | 'distribute';
+/** Wizard steps. Games saved before the circle setup may still hold 'players' or 'assign' (see `setupStepOf`). */
+export type SetupStep = 'roles' | 'seating' | 'names' | 'review' | 'rules' | 'distribute';
 
 export interface PendingWin {
   winner: Alignment;

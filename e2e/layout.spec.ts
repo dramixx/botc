@@ -14,10 +14,11 @@ test.describe('layout', () => {
     await page.goto('/');
     await page.getByRole('button', { name: 'Nouvelle partie' }).click();
     const next = page.locator('.setup-bar .btn.next');
-    for (const step of ['Joueurs', 'Personnages', 'Attribution', 'Règles', 'Distribution']) {
+    for (const step of ['Personnages', 'Placement', 'Prénoms', 'Vérification', 'Règles', 'Distribution']) {
       await expect(page.locator('.step-pill.cur')).toContainText(step);
       expect(await overflowsX(page), step).toBe(false);
       if (step === 'Personnages') await page.getByRole('button', { name: 'Tirer au hasard' }).click();
+      if (step === 'Prénoms') await page.getByRole('button', { name: 'Noms au hasard' }).click();
       if (step === 'Distribution') break;
       await next.click();
     }
@@ -28,8 +29,13 @@ test.describe('layout', () => {
       await page.goto('/');
       await page.getByRole('button', { name: 'Nouvelle partie' }).click();
       const next = page.locator('.setup-bar .btn.next');
-      await next.click();
-      if (step === 'Distribution') { await page.getByRole('button', { name: 'Tirer au hasard' }).click(); await next.click(); await next.click(); await next.click(); }
+      if (step === 'Distribution') {
+        await page.getByRole('button', { name: 'Tirer au hasard' }).click();
+        await next.click();
+        await next.click();
+        await page.getByRole('button', { name: 'Noms au hasard' }).click();
+        for (let i = 0; i < 3; i++) await next.click();
+      }
       await expect(page.locator('.step-pill.cur')).toContainText(step);
       const box = (await next.boundingBox())!;
       expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize()!.width + 1);

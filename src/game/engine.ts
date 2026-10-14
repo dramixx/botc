@@ -5,7 +5,7 @@ import {
 } from '../data/roles';
 import { drawBalanced, weightedShuffle, type DrawStyle } from './drawStyles';
 import { pick, random, seeded, shuffle, uid, type Rng } from './rng';
-import type { Game, Marker, MarkerKey, Nomination, Player, PlayerState, StepAction, StepUndo } from './types';
+import type { Game, Marker, MarkerKey, Nomination, Player, PlayerState, SetupStep, StepAction, StepUndo } from './types';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -71,7 +71,7 @@ export function newGame(opts: { demo?: boolean; count?: number } = {}): Game {
   const now = Date.now();
   const g: Game = {
     id: uid(), version: 1, createdAt: now, updatedAt: now,
-    title: '', demo: !!opts.demo, phase: 'setup', setupStep: 'players',
+    title: '', demo: !!opts.demo, phase: 'setup', setupStep: 'roles',
     playerCount: count, selectedRoles: [], players: [], bluffs: [],
     nightNumber: 0, dayNumber: 0, night: null, day: null,
     executedToday: null, swPromoted: null, pendingWin: null, winner: null, winReason: null, log: [],
@@ -87,6 +87,12 @@ export function makePlayer(name: string, role: RoleId = 'washerwoman'): Player {
   };
 }
 
+/** The wizard step to show; games saved before the circle setup used 'players' (now 'roles') and 'assign' (now 'review'). */
+export function setupStepOf(g: Game): SetupStep {
+  const s = g.setupStep as string;
+  return s === 'players' ? 'roles' : s === 'assign' ? 'review' : g.setupStep;
+}
+
 /** Resizes the (non-traveller) player list. */
 export function setPlayerCount(g: Game, count: number, names?: string[]) {
   count = Math.max(5, Math.min(15, count));
@@ -95,7 +101,8 @@ export function setPlayerCount(g: Game, count: number, names?: string[]) {
   const regular = g.players.filter((p) => !isTraveller(p)).slice(0, count);
   while (regular.length < count) {
     const i = regular.length;
-    regular.push(makePlayer(names?.[i] ?? `${i + 1}`));
+    // Names come once the table is seated (wizard step 3): seats start unnamed.
+    regular.push(makePlayer(names?.[i] ?? ''));
   }
   g.players = [...regular, ...travellers];
 }
@@ -215,6 +222,37 @@ export function autoAssign(g: Game, rng: Rng = random) {
   const roles = shuffle(g.selectedRoles, rng);
   regular.forEach((p, i) => { setRole(g, p, roles[i] ?? 'washerwoman', rng); });
   prepareSecrets(g, rng);
+}
+
+/**
+ * Deals the selected characters while keeping the ones already placed: only the seats whose character left the
+ * selection get one of the new characters. The very first deal (every seat still on the default) is a plain shuffle.
+ */
+export function dealRoles(g: Game, rng: Rng = random) {
+  const regular = g.players.filter((p) => !isTraveller(p));
+  if (regular.every((p) => p.role === regular[0].role)) { autoAssign(g, rng); return; }
+  const left = [...g.selectedRoles];
+  const free: Player[] = [];
+  for (const p of regular) {
+    const i = left.indexOf(p.role);
+    if (i >= 0) left.splice(i, 1);
+    else free.push(p);
+  }
+  const fresh = shuffle(left, rng);
+  for (const p of free) setRole(g, p, fresh.shift() ?? 'washerwoman', rng);
+  prepareSecrets(g, rng);
+}
+
+/** Swaps two seats' characters (role, alignment, Drunk belief, reminders); names and seats stay put. */
+export function swapCharacters(g: Game, aId: string, bId: string) {
+  const a = byId(g, aId), b = byId(g, bId);
+  if (!a || !b || a === b) return;
+  [a.role, b.role] = [b.role, a.role];
+  [a.alignment, b.alignment] = [b.alignment, a.alignment];
+  [a.markers, b.markers] = [b.markers, a.markers];
+  const belief = a.believedRole;
+  if (b.believedRole) a.believedRole = b.believedRole; else delete a.believedRole;
+  if (belief) b.believedRole = belief; else delete b.believedRole;
 }
 
 /** Red herring + bluffs + Drunk belief, keeping existing valid choices. */

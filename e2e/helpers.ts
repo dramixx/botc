@@ -156,6 +156,7 @@ export function randomGame(seed: string, count: number): Game {
   const rng = seeded(seed);
   const g = newGame({ count });
   g.title = `Auto ${seed}`;
+  g.players.forEach((p, i) => { p.name = `Joueur${i + 1}`; });
   g.selectedRoles = randomRoles(count, rng);
   autoAssign(g, rng);
   for (const p of g.players) p.seen = true;
