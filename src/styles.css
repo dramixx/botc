@@ -398,7 +398,6 @@ textarea.notes { width: 100%; min-height: 64px; padding: 12px 14px; border: 0; b
 .res-line > span:first-child { color: var(--amber); font-weight: 600; }
 .res-final { font-size: 15px; font-weight: 600; }
 .misreg { padding: 4px 0; font-size: 14px; }
-.misreg summary { min-height: 44px; display: flex; align-items: center; color: var(--ink2); }
 .inline-picker { margin-top: 6px; }
 .dawn-box { padding: 20px; border-radius: 16px; background: var(--bg); display: flex; flex-direction: column; gap: 6px; }
 .dawn-box .muted { font-size: 14px; }
