@@ -21,6 +21,8 @@ export interface Marker {
   key: MarkerKey;
   /** Player whose ability placed the marker (it only works if that player is sober & healthy). */
   by?: string;
+  /** For Washerwoman / Librarian / Investigator reminders: the exact character shown (shown instead of the team). */
+  shows?: RoleId;
 }
 
 export interface Player {

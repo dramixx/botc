@@ -47,8 +47,9 @@ export function log(g: Game, text: L10n, important = false) {
   g.log.push({ id: uid(), phase, num, text, important });
 }
 
-export function addMarker(p: Player, key: MarkerKey, by?: string) {
-  if (!p.markers.some((m) => m.key === key && m.by === by)) p.markers.push({ key, by });
+export function addMarker(p: Player, key: MarkerKey, by?: string, shows?: RoleId) {
+  const known = p.markers.find((m) => m.key === key && m.by === by);
+  if (known) { if (shows) known.shows = shows; } else p.markers.push(shows ? { key, by, shows } : { key, by });
 }
 export function removeMarkers(g: Game, pred: (m: Marker, p: Player) => boolean) {
   for (const p of g.players) p.markers = p.markers.filter((m) => !pred(m, p));
@@ -612,7 +613,7 @@ function placePingReminders(g: Game, p: Player, role: keyof typeof PING_REMINDER
   const fits = (q: Player) => q.role === data.role || (misreg.includes(q.id)
     && ((q.role === 'spy' && r.team !== 'minion') || (q.role === 'recluse' && r.team === 'minion')));
   const right = targets.find(fits) ?? targets[0];
-  addMarker(right, r.right, p.id);
+  addMarker(right, r.right, p.id, data.role);
   for (const q of targets) if (q !== right) addMarker(q, r.wrong, p.id);
 }
 

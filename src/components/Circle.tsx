@@ -2,7 +2,7 @@ import { ROLES, type RoleId, type Team } from '../data/roles';
 import { isImpaired, isTraveller, stats, wakeRole } from '../game/engine';
 import type { Game, Player } from '../game/types';
 import { T, loc, roleName } from '../i18n';
-import { MARKERS } from './markers';
+import { MARKERS, markerLabel } from './markers';
 import type { Link, Overlay, Tone, TrailMark } from './overlay';
 import { RoleIcon, TONE_VAR, roleSide, sideOf, teamTone } from './ui';
 
@@ -138,7 +138,7 @@ function Token(props: { p: Player; seat: number; x: number; y: number; hidden: b
   if (!hidden) {
     if (drunk) marks.push({ t: roleName('drunk'), tone: 'out' });
     if (mismatch) marks.push({ t: p.alignment === 'evil' ? T('Maléfique', 'Evil') : T('Bon', 'Good'), tone: p.alignment === 'evil' ? 'mal' : 'bon' });
-    for (const m of p.markers) marks.push({ t: loc(MARKERS[m.key].label), tone: MARKERS[m.key].tone, role: MARKERS[m.key].role });
+    for (const m of p.markers) marks.push({ t: markerLabel(m), tone: MARKERS[m.key].tone, role: MARKERS[m.key].role });
     if (isImpaired(p) && !p.markers.some((m) => m.key === 'poisoned' || m.key === 'drunk') && p.role !== 'drunk') marks.push({ t: T('Ivre / empoisonné', 'Impaired'), tone: 'mal' });
   }
   const teamBadge = hidden ? '' : TEAM_BADGE[ROLES[shown].team]();
