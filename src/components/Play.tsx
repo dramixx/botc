@@ -24,6 +24,20 @@ import { Modal, Seg, Switch } from './ui';
 type View = 'phase' | 'log';
 type Dialog = null | 'menu' | 'traveller' | 'rename' | 'finish' | 'abandon' | 'timer' | 'handout' | 'live';
 
+/** Notes written at setup: the first-night ones during night 1, the general ones whenever the grimoire is visible. */
+function StoryNotes({ g }: { g: Game }) {
+  const first = g.phase === 'night' && g.nightNumber === 1 ? g.notesFirstNight?.trim() : '';
+  const general = g.notesGeneral?.trim();
+  if (!first && !general) return null;
+  return (
+    <details class="story-notes" open>
+      <summary>{T('Notes du Conteur', 'Storyteller notes')}</summary>
+      {first && <div><b>{T('Nuit 1', 'Night 1')}</b><p>{first}</p></div>}
+      {general && <div><b>{T('Général', 'General')}</b><p>{general}</p></div>}
+    </details>
+  );
+}
+
 export function Play(props: { game: Game; onHome: () => void }) {
   const g = props.game;
   const { past, future } = useStore();
@@ -128,6 +142,7 @@ export function Play(props: { game: Game; onHome: () => void }) {
               <HoldButton class="btn sm" label={T('Maintenir pour démasquer', 'Hold to unhide')} onHold={() => setHidden(false)} />
             </div>
           )}
+          {!hidden && <StoryNotes g={g} />}
           {panel}
         </aside>
       </div>

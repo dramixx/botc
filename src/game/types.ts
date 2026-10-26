@@ -141,4 +141,8 @@ export interface Game {
   phoneDeal?: boolean;
   /** Turns the grimoire's circle by this many seats (clockwise), to match where the Storyteller sits. */
   rotation?: number;
+  /** Storyteller's notes, written at setup: shown during the first night only. */
+  notesFirstNight?: string;
+  /** Storyteller's notes, written at setup: shown all game long. */
+  notesGeneral?: string;
 }
