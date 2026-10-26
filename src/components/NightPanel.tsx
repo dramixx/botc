@@ -352,7 +352,7 @@ function StepDetail(props: { game: Game; step: NightStep; done: boolean; ctx: Pa
               ? <>{p.name} {p.role === 'drunk' ? T('est l’Ivrogne', 'is the Drunk') : T('est empoisonné(e)', 'is poisoned')}{poisonedBy ? ` (${T('par', 'by')} ${nameOf(g, poisonedBy)})` : ''}. {T('Sa capacité ne fonctionne pas : vous pouvez lui donner une info fausse mais plausible (ou vraie, au choix).', 'Their ability does not work: you may give false but plausible info (or true, your choice).')}</>
               : <>{T('Sa capacité fonctionne : l’information donnée doit être juste.', 'Their ability works: the information must be true.')}{showMisreg && (() => {
                   const names = [...new Set(misregToggles.map((q) => roleName(q.role)))].join(T(' ou ', ' or '));
-                  return ` ${T(`Seul ${names} qui se perçoit différemment peut la modifier (interrupteurs plus bas).`, `Only the ${names} registering differently can change it (toggles below).`)}`;
+                  return ` ${T(`Seul ${names} qui se perçoit différemment peut la modifier (interrupteurs ci-dessous).`, `Only the ${names} registering differently can change it (toggles below).`)}`;
                 })()}</>}
           </span>
         </details>
@@ -367,6 +367,18 @@ function StepDetail(props: { game: Game; step: NightStep; done: boolean; ctx: Pa
 
       {past.length > 0 && (
         <div class="trail-hint"><span class="mini tone-amb"><span class="mini-n">N</span></span>{T('Jetons sur le cercle : ce que ce rôle a déjà désigné ou appris (n° de nuit). Pointillé : ivre/empoisonné, ✗ : info fausse.', 'Tokens on the circle: what this character already picked or learnt (night number). Dashed: drunk/poisoned, ✗: false info.')}</div>
+      )}
+
+      {showMisreg && (
+        <div class="misreg">
+          <div class="eyebrow">{T('PERCEPTION DE L’ESPION / DU RECLUS', 'SPY / RECLUSE REGISTRATION')}</div>
+          {misregToggles.map((q) => (
+            <div key={q.id} class="row-line">
+              <span>{q.name} ({roleName(q.role)}) — {q.role === 'spy' ? T('perçu comme Bon / Villageois', 'registers as good / Townsfolk') : T('perçu comme Maléfique / Démon / Sbire', 'registers as evil / Demon / Minion')}</span>
+              <Switch on={misreg.includes(q.id)} onChange={(on) => recompute(on ? [...misreg, q.id] : misreg.filter((x) => x !== q.id))} />
+            </div>
+          ))}
+        </div>
       )}
 
       {step.kind === 'minioninfo' && (
@@ -511,18 +523,6 @@ function StepDetail(props: { game: Game; step: NightStep; done: boolean; ctx: Pa
           <div class="eyebrow gap-top">{T('PERSONNAGES ABSENTS', 'CHARACTERS NOT IN PLAY')}</div>
           <div class="chips-row">{notInPlay(g).map((r) => <span key={r} class={`bluff-chip tone-${roleSide(r)} ${g.bluffs.includes(r) ? 'is-bluff' : ''}`}>{roleName(r)}{g.bluffs.includes(r) ? ` · ${T('bluff', 'bluff')}` : ''}</span>)}</div>
         </div>
-      )}
-
-      {showMisreg && (
-        <details class="misreg">
-          <summary>{T('Perception de l’Espion / du Reclus', 'Spy / Recluse registration')}</summary>
-          {misregToggles.map((q) => (
-            <div key={q.id} class="row-line">
-              <span>{q.name} ({roleName(q.role)}) — {q.role === 'spy' ? T('perçu comme Bon / Villageois', 'registers as good / Townsfolk') : T('perçu comme Maléfique / Démon / Sbire', 'registers as evil / Demon / Minion')}</span>
-              <Switch on={misreg.includes(q.id)} onChange={(on) => recompute(on ? [...misreg, q.id] : misreg.filter((x) => x !== q.id))} />
-            </div>
-          ))}
-        </details>
       )}
 
       <div class="grow" />
