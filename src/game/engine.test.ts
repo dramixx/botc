@@ -153,7 +153,7 @@ describe('information', () => {
     startNight(g);
     const step = (role: RoleId) => nightSteps(g).find((s) => s.role === role)!;
     completeStep(g, step('washerwoman'), { targets: [P(g, 5).id, P(g, 4).id], role: 'empath' });
-    expect(P(g, 4).markers).toEqual([{ key: 'wwtownsfolk', by: P(g, 2).id }]);
+    expect(P(g, 4).markers).toEqual([{ key: 'wwtownsfolk', by: P(g, 2).id, shows: 'empath' }]);
     expect(P(g, 5).markers).toEqual([{ key: 'wwwrong', by: P(g, 2).id }]);
     // The Recluse registering as a Minion holds the character token.
     completeStep(g, step('investigator'), { targets: [P(g, 4).id, P(g, 6).id], role: 'poisoner', misreg: [P(g, 6).id] });

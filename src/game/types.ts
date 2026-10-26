@@ -21,6 +21,8 @@ export interface Marker {
   key: MarkerKey;
   /** Player whose ability placed the marker (it only works if that player is sober & healthy). */
   by?: string;
+  /** For Washerwoman / Librarian / Investigator reminders: the exact character shown (shown instead of the team). */
+  shows?: RoleId;
 }
 
 export interface Player {
@@ -141,4 +143,8 @@ export interface Game {
   phoneDeal?: boolean;
   /** Turns the grimoire's circle by this many seats (clockwise), to match where the Storyteller sits. */
   rotation?: number;
+  /** Storyteller's notes, written at setup: shown during the first night only. */
+  notesFirstNight?: string;
+  /** Storyteller's notes, written at setup: shown all game long. */
+  notesGeneral?: string;
 }

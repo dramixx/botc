@@ -1,5 +1,6 @@
 import type { L10n, RoleId } from '../data/roles';
-import type { MarkerKey } from '../game/types';
+import { loc, roleName } from '../i18n';
+import type { Marker, MarkerKey } from '../game/types';
 import type { Tone } from './overlay';
 
 /** `role`: the character whose reminder token it is (its icon is drawn on the token, as in the physical Grimoire). */
@@ -22,5 +23,10 @@ export const MARKERS: Record<MarkerKey, { label: L10n; tone: Tone; source: L10n;
   chefpair: { label: { fr: 'Paire', en: 'Pair' }, tone: 'mal', source: { fr: 'Cuisinier', en: 'Chef' }, role: 'chef' },
   invwrong: { label: { fr: 'Faux', en: 'Wrong' }, tone: 'neu', source: { fr: 'Enquêteur', en: 'Investigator' }, role: 'investigator' },
 };
+
+/** Label of a marker on the table: the exact character for a ping reminder ("Saint"), else the generic label. */
+export function markerLabel(m: Marker): string {
+  return m.shows ? roleName(m.shows) : loc(MARKERS[m.key].label);
+}
 
 export const MARKER_KEYS = Object.keys(MARKERS) as MarkerKey[];

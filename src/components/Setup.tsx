@@ -227,6 +227,21 @@ function RolesStep({ g }: { g: Game }) {
 // --- 2. Seating & 4. Review: the table as a circle ------------------------------
 
 /** Drunk belief, Fortune Teller red herring and Demon bluffs: everything that hangs on characters, not on names. */
+/** Storyteller's notes: one box for the first night only, one for the whole game. */
+function NotesBlock({ g }: { g: Game }) {
+  return (
+    <div class="side-block">
+      <div class="eyebrow">{T('NOTES DU CONTEUR', 'STORYTELLER NOTES')}</div>
+      <label class="small muted" for="notes-first">{T('Première nuit uniquement', 'First night only')}</label>
+      <textarea id="notes-first" class="notes" rows={3} value={g.notesFirstNight ?? ''} placeholder={T('Rappels pour la nuit 1…', 'Reminders for night 1…')}
+        onInput={(e) => update((d) => { d.notesFirstNight = (e.target as HTMLTextAreaElement).value; })} />
+      <label class="small muted" for="notes-general">{T('Notes générales', 'General notes')}</label>
+      <textarea id="notes-general" class="notes" rows={3} value={g.notesGeneral ?? ''} placeholder={T('Visibles toute la partie…', 'Shown all game long…')}
+        onInput={(e) => update((d) => { d.notesGeneral = (e.target as HTMLTextAreaElement).value; })} />
+    </div>
+  );
+}
+
 function SecretsPanel({ g }: { g: Game }) {
   const [editingBluff, setEditingBluff] = useState<number | null>(null);
   const [drunkPick, setDrunkPick] = useState(false);
@@ -367,6 +382,7 @@ function TableStep({ g, review }: { g: Game; review: boolean }) {
           ? <div class="banner"><i class="bdot amber" /><span><b>{T('Répartition respectée', 'Distribution matches')}</b> — {check.actual.townsfolk} · {check.actual.outsider} · {check.actual.minion} · {check.actual.demon}.</span></div>
           : <div class="banner warn"><b class="mono">!</b><span><b>{T('Répartition modifiée', 'Distribution changed')} :</b> {check.actual.townsfolk} · {check.actual.outsider} · {check.actual.minion} · {check.actual.demon} ({T('attendu', 'expected')} {check.expected.townsfolk} · {check.expected.outsider} · {check.expected.minion} · {check.expected.demon}).</span></div>)}
         <SecretsPanel g={g} />
+        {!review && <NotesBlock g={g} />}
         {review && (
           <div class="side-block">
             <div class="eyebrow">{T('VOYAGEURS', 'TRAVELLERS')}</div>

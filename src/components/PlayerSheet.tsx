@@ -9,7 +9,7 @@ import { T, TEAM_NAMES, loc, roleName } from '../i18n';
 import { standingLinks } from './Circle';
 import { NightHistory, historyTrail } from './History';
 import { type PanelCtx, useOverlay } from './hooks';
-import { MARKERS, MARKER_KEYS } from './markers';
+import { MARKERS, MARKER_KEYS, markerLabel } from './markers';
 import { revealRole } from './ShowCard';
 import { Modal, RoleIcon, RolePicker, Seg, roleSide, teamTone, toast } from './ui';
 
@@ -77,7 +77,7 @@ export function PlayerSheet(props: { game: Game; id: string; ctx: PanelCtx; onCl
         {p.markers.length === 0 && p.role !== 'drunk'
           ? <div class="dashed-hint center">{T('Aucun marqueur sur', 'No reminder on')} {p.name}</div>
           : <div class="chips-row">{p.markers.map((m, i) => (
-            <button type="button" key={i} class={`pill big tone-${MARKERS[m.key].tone}`} onClick={() => removeMarker(m.key)}>{loc(MARKERS[m.key].label)}{m.by ? ` · ${g.players.find((q) => q.id === m.by)?.name ?? ''}` : ''} ×</button>
+            <button type="button" key={i} class={`pill big tone-${MARKERS[m.key].tone}`} onClick={() => removeMarker(m.key)}>{markerLabel(m)}{m.by ? ` · ${g.players.find((q) => q.id === m.by)?.name ?? ''}` : ''} ×</button>
           ))}</div>}
         <button type="button" class="btn sm" onClick={() => setDlg('marker')}>+ {T('Ajouter un marqueur', 'Add a reminder')}</button>
       </div>
