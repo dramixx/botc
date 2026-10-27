@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { ROLES, rolesOfTeam, type Alignment, type RoleId, type Team } from '../data/roles';
 import {
   L, addMarker, addTraveller, autoAssign, checkSetup, completeRoles, dealRoles, hasMarker, isTraveller, log, movePlayer, notInPlay,
-  prepareSecrets, randomNames, randomRoles, removeMarkers, rerollTeam, setPlayerCount, setRole, setupStepOf, startNight, swapCharacters, wakeRole,
+  prepareSecrets, randomNames, randomRoles, removeMarkers, rerollTeam, rotateCharacters, setPlayerCount, setRole, setupStepOf, startNight, swapCharacters, wakeRole,
 } from '../game/engine';
 import { DRAW_STYLES, STYLE_INFO } from '../game/drawStyles';
 import { random, shuffle } from '../game/rng';
@@ -376,6 +376,7 @@ function TableStep({ g, review }: { g: Game; review: boolean }) {
               ? T('Dernier coup d’œil avant les règles : changez un personnage (même hors sélection) pour rééquilibrer, échangez deux places, corrigez un prénom.', 'Last look before the rules: change a character (even outside the selection) to rebalance, swap two seats, fix a name.')
               : T('Les personnages sont placés au hasard autour de la table. Touchez une place pour la modifier, puis une autre pour échanger.', 'Characters are placed at random around the table. Tap a seat to edit it, then another one to swap.')}</span>
             <button type="button" class="btn sm" onClick={() => update((d) => autoAssign(d))}><b>{T('Mélanger les places', 'Shuffle the seats')}</b></button>
+            <RotateRoles />
           </div>
         )}
         {review && (check.ok
@@ -443,9 +444,23 @@ function NamesStep({ g }: { g: Game }) {
             </label>
           ))}
         </div>
+        <RotateRoles />
         <button type="button" class="btn sm" onClick={() => setShow(!show)}>{show ? T('Masquer les personnages', 'Hide the characters') : T('Afficher les personnages', 'Show the characters')}</button>
         <div class="dashed-hint">{T('Entrée passe au suivant · tous les prénoms sont nécessaires pour continuer', 'Enter jumps to the next one · every name is needed to go on')}</div>
       </aside>
+    </div>
+  );
+}
+
+/** Turns every character one seat around the table: the prepared order is kept, only where it starts changes. */
+function RotateRoles() {
+  return (
+    <div class="stack-xs">
+      <div class="grid-2 tight">
+        <button type="button" class="btn sm" onClick={() => update((d) => rotateCharacters(d, -1))}>↺ {T('Rôles −1 place', 'Roles −1 seat')}</button>
+        <button type="button" class="btn sm" onClick={() => update((d) => rotateCharacters(d, 1))}>{T('Rôles +1 place', 'Roles +1 seat')} ↻</button>
+      </div>
+      <span class="home-note">{T('Fait tourner les personnages autour de la table sans changer leur ordre ; les prénoms restent à leur place.', 'Turns the characters around the table without changing their order; names stay in their seats.')}</span>
     </div>
   );
 }

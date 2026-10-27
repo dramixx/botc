@@ -68,8 +68,7 @@ test.describe('day timer', () => {
     const timer = page.locator('.day-timer');
     await expect(timer.locator('.timer-seg.on')).toHaveText('Discussions privées');
     await expect(timer.getByRole('timer')).toHaveText('6:00');
-    await expect(page.locator('.timer-pill')).toHaveCount(0);
-    await timer.getByRole('button', { name: /Démarrer/ }).click();
+    // The countdown starts with the day.
     await page.clock.runFor(61_000);
     await expect(timer.getByRole('timer')).toHaveText('4:59');
     await expect(page.locator('.timer-pill')).toHaveText('4:59');
@@ -85,7 +84,6 @@ test.describe('day timer', () => {
     await page.clock.install();
     await openWithGame(page, makeGame(TABLE8, { phase: 'day' }));
     const timer = page.locator('.day-timer');
-    await timer.getByRole('button', { name: /Démarrer/ }).click();
     await page.clock.runFor(361_000);
     await expect(timer).toContainText('Temps écoulé');
     await expect(page.locator('.timer-pill')).toHaveText('Temps !');
@@ -103,18 +101,23 @@ test.describe('day timer', () => {
   });
 
   test('settings change the durations and the pace', async ({ page }) => {
+    await page.clock.install();
     await openWithGame(page, makeGame(TABLE8, { phase: 'day' }));
+    await page.locator('.day-timer').getByRole('button', { name: /Pause/ }).click();
     await page.getByRole('button', { name: 'Réglages du minuteur' }).click();
     const modal = page.getByRole('dialog');
     await expect(modal.getByText('Conseillé pour 8 vivants, jour 1.')).toBeVisible();
     await modal.getByRole('button', { name: 'Discussions privées +30 s' }).click();
     await expect(modal.locator('.timer-row').first()).toContainText('6:30');
     await modal.getByRole('button', { name: 'Fermer' }).click();
+    // The countdown is already running (or paused): the new durations apply when the part of the day is picked again.
+    await page.locator('.day-timer .timer-seg', { hasText: 'Discussions privées' }).click();
     await expect(page.locator('.day-timer').getByRole('timer')).toHaveText('6:30');
     await page.getByRole('button', { name: 'Réglages du minuteur' }).click();
     await modal.getByRole('button', { name: 'Tout réinitialiser' }).click();
     await modal.getByRole('button', { name: 'Détendu' }).click();
     await modal.getByRole('button', { name: 'Fermer' }).click();
+    await page.locator('.day-timer .timer-seg', { hasText: 'Discussions privées' }).click();
     await expect(page.locator('.day-timer').getByRole('timer')).toHaveText('8:00');
   });
 
