@@ -343,7 +343,7 @@ export const FIRST_NIGHT: string[] = [
 ];
 export const OTHER_NIGHT: string[] = [
   'dusk', 'poisoner', 'bureaucrat', 'thief', 'monk', 'spy', 'scarletwoman', 'imp', 'ravenkeeper',
-  'undertaker', 'empath', 'fortuneteller', 'butler', 'dawn',
+  'empath', 'fortuneteller', 'undertaker', 'butler', 'dawn',
 ];
 
 /** [townsfolk, outsiders, minions, demons] by player count (5..15). */

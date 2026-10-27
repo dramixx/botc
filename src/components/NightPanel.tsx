@@ -111,7 +111,7 @@ function SpyPanel(props: { game: Game; step: NightStep; done: boolean; ctx: Pane
   const { game: g, step } = props;
   const p = byId(g, step.playerId);
   useOverlay(props.ctx, {
-    hl: p ? { [p.id]: T('Espion', 'Spy') } : {}, links: standingLinks(g),
+    hl: p ? { [p.id]: T('Espion', 'Spy') } : {}, links: standingLinks(g), noDim: true,
     center: [`${T('Nuit', 'Night')} ${g.night?.number}`, `${T('Étape', 'Step')} ${props.num} ${T('sur', 'of')} ${props.total}`, stepTitle(step)],
   });
   const absent = notInPlay(g);
