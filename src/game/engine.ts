@@ -256,6 +256,23 @@ export function swapCharacters(g: Game, aId: string, bId: string) {
   if (belief) b.believedRole = belief; else delete b.believedRole;
 }
 
+/**
+ * Rotates the characters around the table by `delta` seats: their relative order stays the one prepared,
+ * names and seats stay put (Travellers keep their own character).
+ */
+export function rotateCharacters(g: Game, delta: number) {
+  const regular = g.players.filter((p) => !isTraveller(p));
+  const n = regular.length;
+  const shift = ((delta % n) + n) % n;
+  if (!shift) return;
+  const snap = regular.map((p) => ({ role: p.role, alignment: p.alignment, markers: p.markers, believedRole: p.believedRole }));
+  regular.forEach((p, i) => {
+    const src = snap[(i - shift + n) % n];
+    p.role = src.role; p.alignment = src.alignment; p.markers = src.markers;
+    if (src.believedRole) p.believedRole = src.believedRole; else delete p.believedRole;
+  });
+}
+
 /** Red herring + bluffs + Drunk belief, keeping existing valid choices. */
 export function prepareSecrets(g: Game, rng: Rng = random) {
   for (const p of g.players) if (p.role === 'drunk') setRole(g, p, 'drunk', rng);

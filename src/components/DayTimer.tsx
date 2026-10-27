@@ -15,6 +15,10 @@ function useAlarm(g: Game) {
   const { timer, prefs } = useTimer();
   const t = g.phase === 'day' ? activeTimer(g.id, g.dayNumber) : null;
   const left = t ? remainingOf(t) : 1;
+  // The day's countdown starts by itself when the day does.
+  useEffect(() => {
+    if (g.phase === 'day' && !g.day?.ended && !activeTimer(g.id, g.dayNumber)) start(timerFor(g.id, g.dayNumber, aliveAll(g)));
+  }, [g.id, g.phase, g.dayNumber]);
   useEffect(() => {
     if (!t || !isRunning(t) || left > 0) return;
     ring();

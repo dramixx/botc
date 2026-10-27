@@ -338,12 +338,12 @@ export const isGoodTeam = (team: Team) => team === 'townsfolk' || team === 'outs
 
 /** Night order. Special steps: 'dusk', 'minioninfo', 'demoninfo', 'dawn'. */
 export const FIRST_NIGHT: string[] = [
-  'dusk', 'minioninfo', 'demoninfo', 'poisoner', 'bureaucrat', 'thief',
-  'washerwoman', 'librarian', 'investigator', 'chef', 'empath', 'fortuneteller', 'butler', 'spy', 'dawn',
+  'dusk', 'minioninfo', 'demoninfo', 'poisoner', 'bureaucrat', 'thief', 'spy',
+  'washerwoman', 'librarian', 'investigator', 'chef', 'empath', 'fortuneteller', 'butler', 'dawn',
 ];
 export const OTHER_NIGHT: string[] = [
-  'dusk', 'poisoner', 'bureaucrat', 'thief', 'monk', 'scarletwoman', 'imp', 'ravenkeeper',
-  'undertaker', 'empath', 'fortuneteller', 'butler', 'spy', 'dawn',
+  'dusk', 'poisoner', 'bureaucrat', 'thief', 'monk', 'spy', 'scarletwoman', 'imp', 'ravenkeeper',
+  'empath', 'fortuneteller', 'undertaker', 'butler', 'dawn',
 ];
 
 /** [townsfolk, outsiders, minions, demons] by player count (5..15). */

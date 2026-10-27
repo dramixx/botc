@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ROLES, type RoleId } from '../data/roles';
 import {
-  autoAssign, dealRoles, swapCharacters, setupStepOf, chefNumber, checkSetup, numberOptions, completeRoles, completeStep, reorderPlayer, currentStep, demoGame, empathNumber, endDay,
+  autoAssign, dealRoles, rotateCharacters, swapCharacters, setupStepOf, chefNumber, checkSetup, numberOptions, completeRoles, completeStep, reorderPlayer, currentStep, demoGame, empathNumber, endDay,
   fortuneAnswer, newGame, rerollTeam, nightHistory, nightSteps, nominate, randomRoles, recordVote, setRole, slayerShot,
   startDay, startNight, uncompleteStep, aliveCount, byId, executeNow, starpassHeir, addMarker, impKill, hasMarker, addTraveller, votesNeeded, voteWeight, infoConflicts,
 } from './engine';
@@ -14,6 +14,29 @@ function gameWith(roles: RoleId[]): Game {
   return g;
 }
 const P = (g: Game, i: number) => g.players[i];
+
+describe('spy and rotation', () => {
+  it('the Spy wakes right after the Poisoner (and the Monk), before the info roles', () => {
+    const g = gameWith(['imp', 'poisoner', 'spy', 'monk', 'washerwoman', 'empath', 'chef']);
+    startNight(g);
+    const first = nightSteps(g).map((s) => s.role).filter(Boolean);
+    expect(first.indexOf('spy')).toBe(first.indexOf('poisoner') + 1);
+    g.night!.number = 2;
+    const other = nightSteps(g).map((s) => s.role).filter(Boolean);
+    expect(other.indexOf('spy')).toBe(other.indexOf('monk') + 1);
+    expect(other.indexOf('spy')).toBeLessThan(other.indexOf('imp'));
+  });
+
+  it('rotateCharacters keeps the order of the characters and the names in their seats', () => {
+    const g = gameWith(['imp', 'poisoner', 'spy', 'monk', 'washerwoman', 'empath']);
+    rotateCharacters(g, 1);
+    expect(g.players.map((p) => p.role)).toEqual(['empath', 'imp', 'poisoner', 'spy', 'monk', 'washerwoman']);
+    expect(g.players.map((p) => p.name)).toEqual(['P0', 'P1', 'P2', 'P3', 'P4', 'P5']);
+    expect(g.players[1].alignment).toBe('evil');
+    rotateCharacters(g, -1);
+    expect(g.players.map((p) => p.role)).toEqual(['imp', 'poisoner', 'spy', 'monk', 'washerwoman', 'empath']);
+  });
+});
 
 describe('setup helpers', () => {
   it('completeRoles fixes any selection to the distribution', () => {

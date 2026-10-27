@@ -65,7 +65,10 @@ export function NightPanel(props: { game: Game; ctx: PanelCtx }) {
           );
         })}
       </div>
-      {step.kind === 'dawn'
+      {step.kind === 'role' && step.role === 'spy'
+        ? <SpyPanel key={step.key + (done.includes(step.key) ? ':done' : '')} game={g} step={step} done={done.includes(step.key)} ctx={props.ctx}
+            num={idx + 1} total={total} onPrev={idx > 0 ? () => setSelected(steps[idx - 1].key) : undefined} />
+        : step.kind === 'dawn'
         ? <DawnPanel key={step.key} game={g} step={step} ctx={props.ctx} num={idx + 1} total={total} onBack={() => lastBeforeDawn && setSelected(lastBeforeDawn.key)} />
         : <StepDetail key={step.key + (done.includes(step.key) ? ':done' : '')} game={g} step={step} done={done.includes(step.key)} ctx={props.ctx}
             num={idx + 1} total={total} onPrev={idx > 0 ? () => setSelected(steps[idx - 1].key) : undefined} />}
@@ -98,6 +101,40 @@ function DawnPanel(props: { game: Game; step: NightStep; ctx: PanelCtx; num: num
       <div class="panel-foot col">
         <button type="button" class="btn" onClick={props.onBack}>{T('Revenir sur la nuit', 'Back to the night')}</button>
         <button type="button" class="btn amber lg" onClick={() => update((d) => { completeStep(d, props.step, { targets: [] }); startDay(d); })}>{T('Commencer le jour', 'Start day')} {g.nightNumber}</button>
+      </div>
+    </>
+  );
+}
+
+/** The Spy only needs the Grimoire in their hands: a short panel, the circle does the talking. */
+function SpyPanel(props: { game: Game; step: NightStep; done: boolean; ctx: PanelCtx; num: number; total: number; onPrev?: () => void }) {
+  const { game: g, step } = props;
+  const p = byId(g, step.playerId);
+  useOverlay(props.ctx, {
+    hl: p ? { [p.id]: T('Espion', 'Spy') } : {}, links: standingLinks(g), noDim: true,
+    center: [`${T('Nuit', 'Night')} ${g.night?.number}`, `${T('Étape', 'Step')} ${props.num} ${T('sur', 'of')} ${props.total}`, stepTitle(step)],
+  });
+  const absent = notInPlay(g);
+  return (
+    <>
+      <div class="step-title">
+        <h2 class="panel-title xl">{stepTitle(step)}</h2>
+        <span class="muted">{p ? `${p.name}${!p.alive ? ' · ☠' : ''}` : ''}{props.done && <span class="tag ok"> ✓ {T('Fait', 'Done')}</span>}</span>
+      </div>
+      <div class="instr">{T('Démasquez et montrez le Grimoire.', 'Unhide and show the Grimoire.')}</div>
+      {props.ctx.hidden && <button type="button" class="btn amber lg" onClick={() => props.ctx.setHidden(false)}>{T('Démasquer', 'Unhide')}</button>}
+      <div class="info-block">
+        <div class="eyebrow">{T('ABSENTS', 'NOT IN PLAY')}</div>
+        <div class="chips-row">{absent.map((r) => <span key={r} class={`bluff-chip tone-${roleSide(r)} ${g.bluffs.includes(r) ? 'is-bluff' : ''}`}>{roleName(r)}</span>)}</div>
+      </div>
+      <div class="grow" />
+      <div class="panel-foot col">
+        <div class="grid-nav">
+          <button type="button" class="btn" disabled={!props.onPrev} onClick={props.onPrev}>← {T('Préc.', 'Prev')}</button>
+          {props.done
+            ? <button type="button" class="btn lg" onClick={() => update((d) => uncompleteStep(d, step.key))}>{T('Rouvrir l’étape', 'Reopen step')}</button>
+            : <button type="button" class="btn amber lg" onClick={() => update((d) => completeStep(d, step, { targets: [] }))}>{`${T('Étape faite', 'Step done')} →`}</button>}
+        </div>
       </div>
     </>
   );
@@ -339,7 +376,6 @@ function StepDetail(props: { game: Game; step: NightStep; done: boolean; ctx: Pa
         {step.kind === 'dusk' ? T('Demandez à tous les joueurs de fermer les yeux.', 'Ask all players to close their eyes.') :
           step.kind === 'minioninfo' ? T('Réveillez tous les Sbires. Montrez-leur le Démon et laissez-les se reconnaître. Rappelez-leur d’aller demander les 3 bluffs au Démon dans la journée.', 'Wake all Minions. Show them the Demon and let them see each other. Remind them to ask the Demon for the 3 bluffs during the day.') :
           step.kind === 'demoninfo' ? T('Réveillez le Démon. Montrez-lui ses Sbires, puis 3 personnages absents (bluffs). Rappelez-lui de les transmettre à ses Sbires.', 'Wake the Demon. Show them their Minions, then 3 characters not in play (bluffs). Remind them to pass them on to their Minions.') :
-          step.role === 'spy' ? T('Désactivez le mode masqué et montrez le Grimoire à l’Espion.', 'Turn off hidden mode and show the Grimoire to the Spy.') :
           reminder ? loc(reminder) : ''}
       </div>
       {step.kind === 'dusk' && <Narration lines={DUSK} seed={g.nightNumber - 1} />}
@@ -515,15 +551,6 @@ function StepDetail(props: { game: Game; step: NightStep; done: boolean; ctx: Pa
         </>
       )}
       {promoted && <div class="instr">{T('Réveillez ce joueur et montrez-lui qu’il est désormais le Diable. Il ne tue pas cette nuit.', 'Wake this player and show them they are now the Imp. They do not kill tonight.')}</div>}
-
-      {step.role === 'spy' && (
-        <div class="info-block">
-          <div class="eyebrow">{T('CE QUE VOIT L’ESPION', 'WHAT THE SPY SEES')}</div>
-          <div class="small muted">{T('Le Grimoire montre tout : personnages, marqueurs (poison, ivresse, Maître du Majordome, faux positif…). C’est normal : l’Espion voit le Grimoire en entier.', 'The Grimoire shows everything: characters and reminders (poison, drunkenness, Butler’s master, red herring…). That is expected: the Spy sees the whole Grimoire.')}</div>
-          <div class="eyebrow gap-top">{T('PERSONNAGES ABSENTS', 'CHARACTERS NOT IN PLAY')}</div>
-          <div class="chips-row">{notInPlay(g).map((r) => <span key={r} class={`bluff-chip tone-${roleSide(r)} ${g.bluffs.includes(r) ? 'is-bluff' : ''}`}>{roleName(r)}{g.bluffs.includes(r) ? ` · ${T('bluff', 'bluff')}` : ''}</span>)}</div>
-        </div>
-      )}
 
       <div class="grow" />
       <div class="panel-foot col">
